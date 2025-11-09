@@ -3,6 +3,7 @@ using module .\ui\main-form.psm1
 using module .\models\ast-model.psm1
 
 Set-StrictMode -Version Latest
+
 Class AstViewer {
     AstViewer([string]$Path) {
         if ($Path) {
