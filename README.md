@@ -70,6 +70,12 @@ This will open a graphical window displaying the Abstract Syntax Tree of the spe
 
 ---
 
+## 🖼️ Screenshot
+
+Here is the PsAstViewer interface:
+
+![AST Viewer UI](https://github.com/user-attachments/assets/c515813e-2b66-49f6-9a85-4d7a30e6fbf7)
+
 ## 🖥️ User Interface Overview
 
 The application window consists of three main panels:
