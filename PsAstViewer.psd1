@@ -20,7 +20,7 @@
     PrivateData       = @{
         PSData = @{
             Tags       = @('PowerShell', 'AST', 'Syntax', 'Viewer', 'Explorer', 'GUI', 'Tool')
-            LicenseUri = 'https://github.com/Krinopotam/PsAstViewer/blob/master/LICENSE.txt'
+            LicenseUri = 'https://github.com/Krinopotam/PsAstViewer/blob/master/LICENSE'
             ProjectUri = 'https://github.com/Krinopotam/PsAstViewer'
             # IconUri = ''
             # ReleaseNotes = ''
