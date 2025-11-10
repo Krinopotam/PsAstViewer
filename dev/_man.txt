@@ -1,0 +1,21 @@
+# Check
+Get-Module PowerShellGet, PackageManagement -ListAvailable
+
+# recomended
+#	PowerShellGet ≥ 2.2.5
+# 	PackageManagement ≥ 1.4.8.1
+
+# Run powershell in Admin mode
+# Enable TLS 1.2
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
+# Update PackageManagement
+Install-Module PackageManagement -Force -Scope AllUsers
+
+# 3. Update PowerShellGet
+Install-Module PowerShellGet -Force -Scope AllUsers
+
+# 4. Install PSResourceGet
+Install-Module Microsoft.PowerShell.PSResourceGet -Scope AllUsers -Force
+
+# 5. Restart PowerShell
