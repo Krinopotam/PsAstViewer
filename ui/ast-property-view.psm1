@@ -195,7 +195,7 @@ Class AstPropertyView {
     [string]getPropertyValue([object]$prop) {
         if ($null -eq $prop.Value) { return 'null' }
 
-        if ($this.isValuePrimitive($prop.Value) -or $prop.Value -is [IScriptExtent]) {
+        if ($this.isValuePrimitive($prop.Value) -or $prop.Value -is [enum] -or $prop.Value -is [IScriptExtent]) {
             $val = $prop.Value.ToString() 
             if ($val.Length -gt 50) { $val = $val.Substring(0, 50) + "..." }
             return $val
