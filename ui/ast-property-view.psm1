@@ -1,6 +1,5 @@
 ﻿using module .\progress-bar.psm1
 using module ..\models\ast-model.psm1
-using module ..\utils\ast-colors-generator.psm1
 using module ..\utils\node-drawer.psm1
 using module ..\utils\text-tag-parser.psm1
 using namespace System.Management.Automation.Language
@@ -11,15 +10,15 @@ Class AstPropertyView {
     [System.Windows.Forms.TreeView]$instance
     [AstModel]$astModel
     [NodeDrawer]$nodeDrawer
-    [AstColorsGenerator]$colorsGenerator
     [TextTagParser]$tagParser
+    [hashtable]$astColorsMap
 
-    AstPropertyView([object]$mainForm, [System.Windows.Forms.Control]$container) {
+    AstPropertyView([object]$mainForm, [System.Windows.Forms.Control]$container, [hashtable]$astColorsMap) {
         $this.mainForm = $mainForm
         $this.container = $container
+        $this.astColorsMap = $astColorsMap
         $this.tagParser = [TextTagParser]::new("black", "white")
         $this.nodeDrawer = [NodeDrawer]::new()
-        $this.colorsGenerator = [AstColorsGenerator]::new()
         $this.instance = $this.Init()
     }   
 
@@ -138,12 +137,18 @@ Class AstPropertyView {
             $i = 0
             foreach ($p in $obj) {
                 $node = [System.Windows.Forms.TreeNode]::new()
-                $node.Text = "item[$i]"
-                $taggedText = "item[$i]"
-                if ($p -is [Ast]) { $taggedText = "<b>$taggedText</b>" }
+                $type = $p.GetType().Name
+                $node.Text = "[$i][$type]"
+
+                $taggedType = $type
+                $color = "#CD9C6C"
+                if ($p -is [Ast]) { 
+                    if ($this.astColorsMap.ContainsKey($type)) { $color = $this.astColorsMap[$type] }
+                    $taggedType = "<b>$taggedType</b>" 
+                }
                 $node.Tag = @{
                     Parameter = $p
-                    NameParts = $this.tagParser.Parse($taggedText)
+                    NameParts = $this.tagParser.Parse("[$i]<color:#C480DC>[</color><color:$color>$taggedType</color><color:#C480DC>]</color>")
                 }
                 if ($p -and -not $this.isValuePrimitive($p)) { $node.Nodes.Add("[Loading...]") }
                 $parentNode.Nodes.Add($node)

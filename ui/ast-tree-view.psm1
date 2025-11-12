@@ -1,6 +1,5 @@
 ﻿using module .\progress-bar.psm1
 using module ..\models\ast-model.psm1
-using module ..\utils\ast-colors-generator.psm1
 using module ..\utils\node-drawer.psm1
 using module ..\utils\text-tag-parser.psm1
 using namespace System.Management.Automation.Language
@@ -12,17 +11,17 @@ Class AstTreeView {
     [System.Windows.Forms.TreeView]$dummyInstance
     [AstModel]$astModel
     [NodeDrawer]$nodeDrawer
-    [AstColorsGenerator]$colorsGenerator
     [TextTagParser]$tagParser
     [bool]$inUpdate
     [bool]$isUpdatedFromViewBox
+    [hashtable]$astColorsMap
 
-    AstTreeView([object]$mainForm, [System.Windows.Forms.Control]$container) {
+    AstTreeView([object]$mainForm, [System.Windows.Forms.Control]$container, [hashtable]$astColorsMap) {
         $this.mainForm = $mainForm
         $this.container = $container
+        $this.astColorsMap = $astColorsMap
         $this.tagParser = [TextTagParser]::new("black", "white")
         $this.nodeDrawer = [NodeDrawer]::new()
-        $this.colorsGenerator = [AstColorsGenerator]::new()
         $this.instance = $this.Init()
     }   
 
@@ -97,16 +96,13 @@ Class AstTreeView {
         $tree.Nodes.Clear()
         
         $idx = @{val = -1 }
-        $colorsMap = $this.colorsGenerator.GetColorsMap()
         function Recurse($astMap, $ast, $parentNode, $idx, $pb) {
             $idx.val = $idx.val + 1
             $pb.Update($idx.val)
 
             $astName = $ast.GetType().Name
             $color = "Black"
-            if ($colorsMap.ContainsKey($astName)) {
-                $color = $colorsMap[$astName]
-            }
+            if ($this.astColorsMap.ContainsKey($astName)) { $color = $this.astColorsMap[$astName] }
 
             $codeBlockName = ""
             if ($ast.PSObject.Properties["Name"]) {

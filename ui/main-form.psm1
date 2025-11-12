@@ -3,6 +3,7 @@ using module .\ast-tree-view.psm1
 using module .\ast-property-view.psm1
 using module .\progress-bar.psm1
 using module ..\models\ast-model.psm1
+using module ..\utils\ast-colors-generator.psm1
 
 using namespace System.Management.Automation.Language
 using namespace System.Windows.Forms
@@ -21,8 +22,11 @@ Class MainForm {
     [bool]$ctrlPressed = $false
     [bool]$altPressed = $false
     [bool]$shiftPressed = $false
+    [hashtable]$astColorsMap
 
     MainForm() {
+        $astColorsGenerator = [AstColorsGenerator]::new()
+        $this.astColorsMap = $astColorsGenerator.GetColorsMap()
         $this.instance = $this.Init()
     }    
 
@@ -120,8 +124,8 @@ Class MainForm {
 
     [void]Show([string]$scriptPath = "") {
         $this.codeViewBox = [CodeViewBox]::new($this, $this.rightPanel)
-        $this.astTreeView = [AstTreeView]::new($this, $this.leftTopPanel)
-        $this.astPropertyView = [AstPropertyView]::new($this, $this.leftBottomPanel)
+        $this.astTreeView = [AstTreeView]::new($this, $this.leftTopPanel, $this.astColorsMap)
+        $this.astPropertyView = [AstPropertyView]::new($this, $this.leftBottomPanel, $this.astColorsMap)
 
         $this.lastLoadedPath = $scriptPath
 
