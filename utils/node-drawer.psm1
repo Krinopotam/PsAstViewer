@@ -1,6 +1,9 @@
 Class NodeDrawer {
     [void]drawNode([System.Windows.Forms.TreeView]$s, [System.Windows.Forms.DrawTreeNodeEventArgs]$e, [hashtable[]]$nameParts) {
-        
+
+        # Prevent top artifact nodes on expand
+        if ($e.Bounds.Y -eq 0 -and $e.Bounds.X -lt 0 -and $e.Node -ne $s.TopNode) { $e.DrawDefault = $true; return }
+
         $bgColor = $s.BackColor
         $textColor = $s.ForeColor
 
@@ -17,9 +20,6 @@ Class NodeDrawer {
         $y = [float]$e.Bounds.Y
 
         foreach ($part in $nameParts) {
-            if ($part.Text -eq "[") { 
-                $i = 0
-            }
             if (-not $e.Node.IsSelected) { $textColor = [System.Drawing.Color]$part.Color }
             $brush = [System.Drawing.SolidBrush]::new($textColor)
 
