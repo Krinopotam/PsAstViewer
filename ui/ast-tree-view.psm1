@@ -16,10 +16,8 @@ Class AstTreeView {
     [bool]$inUpdate
     [bool]$isUpdatedFromViewBox
     [hashtable]$astColorsMap
-    [bool]$inlined
 
-    AstTreeView([object]$mainForm, [System.Windows.Forms.Control]$container, [hashtable]$astColorsMap, [bool]$inlined) {
-        $this.inlined = $inlined
+    AstTreeView([object]$mainForm, [System.Windows.Forms.Control]$container, [hashtable]$astColorsMap) {
         $this.mainForm = $mainForm
         $this.container = $container
         $this.astColorsMap = $astColorsMap
@@ -52,10 +50,7 @@ Class AstTreeView {
         $this.container.Controls.Add($treeView)
 
         $this.InitEvents($treeView) 
-                    
-        if (-not $this.inlined) { 
-            $this.initContextMenu($treeView)
-        }
+        $this.initContextMenu($treeView)                    
 
         # Dummy TreeView to be used when the real TreeView is not visible
         $dummyTreeView = [System.Windows.Forms.TreeView]::new()
@@ -93,16 +88,20 @@ Class AstTreeView {
     }
 
     [void]initEvents( [System.Windows.Forms.TreeView]$treeView) {
-        if (-not $this.inlined) { 
-            $treeView.Add_AfterSelect({ 
-                    param($s, $e)
-                    $self = $s.Tag
-                    $node = $e.Node
-                    $keepCaretPos = $false
-                    if ($self.isUpdatedFromViewBox) { $keepCaretPos = $true }
-                    $self.mainForm.onAstNodeSelected($node.Tag.Ast, $node.Tag.Index, $keepCaretPos)
-                })
-        }
+        $treeView.Add_AfterSelect({ 
+                param($s, $e)
+                $self = $s.Tag
+                $node = $e.Node
+                $keepCaretPos = $false
+                if ($self.isUpdatedFromViewBox) { $keepCaretPos = $true }
+                $self.mainForm.onAstNodeSelected($node.Tag.Ast, $node.Tag.Index, $keepCaretPos)
+            })
+
+        $treeView.Add_NodeMouseClick({
+                param($s, $e)
+                $self = $s.Tag
+                if ($e.Button -eq [System.Windows.Forms.MouseButtons]::Right) { $self.instance.SelectedNode = $e.Node }
+            })
 
         $treeView.Add_DrawNode({
                 param($s, $e)
@@ -115,7 +114,7 @@ Class AstTreeView {
     [void]initContextMenu([System.Windows.Forms.TreeView]$treeView) {
         $menu = [System.Windows.Forms.ContextMenuStrip]::new()
 
-        $showFindAllUnnested = $menu.Items.Add("Show Ast.FindAll({...}, $false)")
+        $showFindAllUnnested = $menu.Items.Add("Filtered Shallow View (FindAll nested = false)")
         $showFindAllUnnested.Add_Click({ 
                 param($s, $e)
                 # sender is a ToolStripMenuItem; get its ContextMenuStrip (owner)
@@ -126,7 +125,7 @@ Class AstTreeView {
 
                 $self = $ctrl.Tag
                 $curAst = $node.Tag.Ast
-                $self.mainForm.showFindAllCommandView($curAst, $false)
+                $self.mainForm.filterByFindAllCommand($curAst, $false)
             })
 
         $treeView.ContextMenuStrip = $menu

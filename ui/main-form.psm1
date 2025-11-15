@@ -1,7 +1,6 @@
 ﻿using module .\code-view-box.psm1
 using module .\ast-tree-view.psm1
 using module .\ast-property-view.psm1
-using module .\find-all-form.psm1
 using module .\progress-bar.psm1
 using module ..\models\ast-model.psm1
 using module ..\utils\ast-colors-generator.psm1
@@ -40,10 +39,9 @@ Class MainForm {
     [bool]$shiftPressed = $false
     # Colors map for ast nodes
     [hashtable]$astColorsMap
-    # Keep the offset of the filtered ast extent
+    # Keep the offset of the filtered ast extent (ast extent has positions from full script code, but filtered extents code is a subset of the full code)
     [int]$filteredOffset = 0
     
-
     MainForm() {
         $astColorsGenerator = [AstColorsGenerator]::new()
         $this.astColorsMap = $astColorsGenerator.GetColorsMap()
@@ -144,7 +142,7 @@ Class MainForm {
 
     [void]Show([string]$scriptPath = "") {
         $this.codeViewBox = [CodeViewBox]::new($this, $this.rightPanel)
-        $this.astTreeView = [AstTreeView]::new($this, $this.leftTopPanel, $this.astColorsMap, $false)
+        $this.astTreeView = [AstTreeView]::new($this, $this.leftTopPanel, $this.astColorsMap)
         $this.astPropertyView = [AstPropertyView]::new($this, $this.leftBottomPanel, $this.astColorsMap)
 
         $this.lastLoadedPath = $scriptPath
@@ -172,6 +170,7 @@ Class MainForm {
         $this.lastLoadedPath = $path
         $this.loadedAstModel = [AstModel]::FromFile($path)
         $this.filteredAstModel = $null
+        $this.filteredOffset = 0
         $this.setAstModel($this.loadedAstModel)
     }
 
@@ -203,6 +202,7 @@ Class MainForm {
     [void]onCodeChanged([string]$script) {
         $this.loadedAstModel = [AstModel]::FromScript($script)
         $this.filteredAstModel = $null
+        $this.filteredOffset = 0
         $this.setAstModel($this.loadedAstModel)
     }
 
@@ -211,17 +211,16 @@ Class MainForm {
         $this.astTreeView.selectNodeByCharIndex($charIndex)
     }
 
-    [void]showFindAllCommandView([Ast]$ast, [bool]$includeNested) {
+    # Set Ast filter by $ast.FindAll()
+    [void]filterByFindAllCommand([Ast]$ast, [bool]$includeNested) {
         $this.filteredAstModel = [AstModel]::FromAst($ast, $includeNested)
         $this.filteredOffset = $ast.Extent.StartOffset
         $this.setAstModel($this.filteredAstModel)
-        #$findAllForm = [FindAllForm]::new($this, $this.astColorsMap, $ast, $includeNested)
-        #$findAllForm.Show()
     }
 
     [void]onFilterCleared() {
-        $this.filteredOffset = 0
         $this.filteredAstModel = $null
+        $this.filteredOffset = 0
         $this.setAstModel($this.loadedAstModel)
     }
 }

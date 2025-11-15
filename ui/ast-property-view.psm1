@@ -33,6 +33,7 @@ Class AstPropertyView {
         $this.container.Controls.Add($label)
 
         $treeView = [System.Windows.Forms.TreeView]::new()
+        $treeView.Tag = $this
         $treeView.Name = "treePropView"
         $treeView.Top = $label.Bottom
         $treeView.Left = 10
@@ -42,10 +43,53 @@ Class AstPropertyView {
         $treeView.Font = New-Object System.Drawing.Font("Courier New", 12)
         $treeView.HideSelection = $false
         $treeView.ShowNodeToolTips = $true
-        $treeView.Tag = $this
         $treeView.DrawMode = [System.Windows.Forms.TreeViewDrawMode]::OwnerDrawText
         $this.container.Controls.Add($treeView)
 
+        $this.InitEvents($treeView) 
+        $this.initContextMenu($treeView)  
+
+        return $treeView
+    }
+
+    [void]initEvents( [System.Windows.Forms.TreeView]$treeView) {
+        $treeView.add_BeforeExpand({
+                param($s, $e)
+                $self = $s.Tag
+
+                $obj = $e.Node.Tag.Parameter
+                $self.addPropertiesNodes($obj, $e.Node)
+            })
+
+        $treeView.Add_AfterSelect({ 
+                param($s, $e)
+                $self = $s.Tag
+                $obj = $e.Node.Tag.Parameter
+                $ast = $null
+                if ($obj -is [Ast]) { $ast = [Ast]$obj }
+                $self.mainForm.onParameterSelected($obj, $ast)
+            })
+
+        $treeView.Add_NodeMouseClick({
+                param($s, $e)
+                $self = $s.Tag
+                $ctrl = $self.mainForm.ctrlPressed
+                if ($e.Button -eq [System.Windows.Forms.MouseButtons]::Left -and $ctrl -and $e.node) {
+                    $obj = $e.node.Tag.Parameter
+                    if ($obj -is [Ast]) { $self.mainForm.selectAstInTreeView($obj) }
+                }
+                elseif ($e.Button -eq [System.Windows.Forms.MouseButtons]::Right) { 
+                    $self.instance.SelectedNode = $e.Node 
+                }
+            })
+
+        $treeView.Add_DrawNode({
+                param($s, $e)
+                $s.Tag.nodeDrawer.drawNode($s, $e, $e.Node.Tag.NameParts)
+            })
+    }
+
+    [void]initContextMenu([System.Windows.Forms.TreeView]$treeView) {
         $menu = [System.Windows.Forms.ContextMenuStrip]::new()
         $menu.Add_Opening({
                 param($s, $e)
@@ -75,46 +119,21 @@ Class AstPropertyView {
                 if ($obj -is [Ast]) { $self.mainForm.selectAstInTreeView($obj) }
             })
 
-        # Навешиваем меню
+        $showFindAllUnnested = $menu.Items.Add("Filtered Shallow View (FindAll nested = false)")
+        $showFindAllUnnested.Add_Click({ 
+                param($s, $e)
+                # sender is a ToolStripMenuItem; get its ContextMenuStrip (owner)
+                $cms = $s.GetCurrentParent()
+                $ctrl = $cms.SourceControl
+                $node = $ctrl.SelectedNode
+                if (-not $node) { return }
+
+                $self = $ctrl.Tag
+                $obj = $node.Tag.Parameter
+                if ($obj -is [Ast]) { $self.mainForm.filterByFindAllCommand($obj, $false) }
+            })
+
         $treeView.ContextMenuStrip = $menu
-
-        $treeView.add_BeforeExpand({
-                param($s, $e)
-                $self = $s.Tag
-
-                $obj = $e.Node.Tag.Parameter
-                $self.addPropertiesNodes($obj, $e.Node)
-            })
-
-        $treeView.Add_AfterSelect({ 
-                param($s, $e)
-                $self = $s.Tag
-                $obj = $e.Node.Tag.Parameter
-                $ast = $null
-                if ($obj -is [Ast]) { $ast = [Ast]$obj }
-                $self.mainForm.onParameterSelected($obj, $ast)
-            })
-
-        $treeView.Add_MouseDown({
-                param($s, $e)
-                $self = $s.Tag
-                $ctrl = $self.mainForm.ctrlPressed
-                $node = $s.GetNodeAt($e.X, $e.Y)
-
-                if ($e.Button -eq [System.Windows.Forms.MouseButtons]::Left -and $ctrl -and $node) {
-                    $self = $s.Tag
-                    $obj = $node.Tag.Parameter
-                    if ($obj -is [Ast]) { $self.mainForm.selectAstInTreeView($obj) }
-                }
-            })
-
-        $treeView.Add_DrawNode({
-                param($s, $e)
-                $s.Tag.nodeDrawer.drawNode($s, $e, $e.Node.Tag.NameParts)
-            })
-
-        $treeView.Tag = $this
-        return $treeView
     }
 
     [void]setAstModel([AstModel]$astModel, [ProgressBar]$pb) {
@@ -236,7 +255,7 @@ Class AstPropertyView {
 
     [string]highlightMethodFullName([string] $str) {
         # Highlight method types
-        $str =  [regex]::Replace(
+        $str = [regex]::Replace(
             $str,
             '(?<type>[A-Za-z_]\w*(\[[^\]]+\])?)(?=\s+[A-Za-z_]\w*)',
             '<color:#C480DC>[</color><color:#CD9C6C>${type}</color><color:#C480DC>]</color>'
