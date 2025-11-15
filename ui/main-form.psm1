@@ -1,6 +1,7 @@
 ﻿using module .\code-view-box.psm1
 using module .\ast-tree-view.psm1
 using module .\ast-property-view.psm1
+using module .\find-all-form.psm1
 using module .\progress-bar.psm1
 using module ..\models\ast-model.psm1
 using module ..\utils\ast-colors-generator.psm1
@@ -9,20 +10,39 @@ using namespace System.Management.Automation.Language
 using namespace System.Windows.Forms
         
 Class MainForm {
+    # Main form instance
     [System.Windows.Forms.Form]$instance
+    # Left panel instance
     [System.Windows.Forms.Panel]$leftTopPanel
+    # Left panel instance
     [System.Windows.Forms.Panel]$leftBottomPanel
+    # Right panel instance
     [System.Windows.Forms.Panel]$rightPanel
+    # Code view box instance
     [CodeViewBox]$codeViewBox
+    # Ast tree view instance
     [AstTreeView]$astTreeView
+    # Ast property view instance
     [AstPropertyView]$astPropertyView
+    # Current shown ast model
     [AstModel]$astModel
-    [AstModel]$initialAstModel
+    # Last loaded ast model
+    [AstModel]$loadedAstModel
+    # Filtered ast model
+    [AstModel]$filteredAstModel
+    # Keep the path of the last loaded script
     [string]$lastLoadedPath
+    # Is the control key pressed
     [bool]$ctrlPressed = $false
+    # Is the alt key pressed
     [bool]$altPressed = $false
+    # Is the shift key pressed
     [bool]$shiftPressed = $false
+    # Colors map for ast nodes
     [hashtable]$astColorsMap
+    # Keep the offset of the filtered ast extent
+    [int]$filteredOffset = 0
+    
 
     MainForm() {
         $astColorsGenerator = [AstColorsGenerator]::new()
@@ -124,7 +144,7 @@ Class MainForm {
 
     [void]Show([string]$scriptPath = "") {
         $this.codeViewBox = [CodeViewBox]::new($this, $this.rightPanel)
-        $this.astTreeView = [AstTreeView]::new($this, $this.leftTopPanel, $this.astColorsMap)
+        $this.astTreeView = [AstTreeView]::new($this, $this.leftTopPanel, $this.astColorsMap, $false)
         $this.astPropertyView = [AstPropertyView]::new($this, $this.leftBottomPanel, $this.astColorsMap)
 
         $this.lastLoadedPath = $scriptPath
@@ -150,8 +170,9 @@ Class MainForm {
         }
 
         $this.lastLoadedPath = $path
-        $model = [AstModel]::FromFile($path)
-        $this.setAstModel($model)
+        $this.loadedAstModel = [AstModel]::FromFile($path)
+        $this.filteredAstModel = $null
+        $this.setAstModel($this.loadedAstModel)
     }
 
     [void]openScript() {
@@ -180,12 +201,28 @@ Class MainForm {
     }
 
     [void]onCodeChanged([string]$script) {
-        $this.setAstModel([AstModel]::FromScript($script))
+        $this.loadedAstModel = [AstModel]::FromScript($script)
+        $this.filteredAstModel = $null
+        $this.setAstModel($this.loadedAstModel)
     }
 
     [void]onCharIndexSelected([int]$charIndex) {
         $this.astTreeView.instance.Focus()
         $this.astTreeView.selectNodeByCharIndex($charIndex)
+    }
+
+    [void]showFindAllCommandView([Ast]$ast, [bool]$includeNested) {
+        $this.filteredAstModel = [AstModel]::FromAst($ast, $includeNested)
+        $this.filteredOffset = $ast.Extent.StartOffset
+        $this.setAstModel($this.filteredAstModel)
+        #$findAllForm = [FindAllForm]::new($this, $this.astColorsMap, $ast, $includeNested)
+        #$findAllForm.Show()
+    }
+
+    [void]onFilterCleared() {
+        $this.filteredOffset = 0
+        $this.filteredAstModel = $null
+        $this.setAstModel($this.loadedAstModel)
     }
 }
  

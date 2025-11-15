@@ -46,7 +46,7 @@ Class AstPropertyView {
         $treeView.DrawMode = [System.Windows.Forms.TreeViewDrawMode]::OwnerDrawText
         $this.container.Controls.Add($treeView)
 
-        $menu = New-Object System.Windows.Forms.ContextMenuStrip
+        $menu = [System.Windows.Forms.ContextMenuStrip]::new()
         $menu.Add_Opening({
                 param($s, $e)
                 $ctrl = $s.SourceControl
@@ -133,38 +133,55 @@ Class AstPropertyView {
 
     [void]addPropertiesNodes([object]$obj, $parentNode) {
         $parentNode.Nodes.Clear()
-        if ($obj -is [System.Collections.IEnumerable] -and -not ($obj -is [string])) {
-            $i = 0
-            foreach ($p in $obj) {
-                $node = [System.Windows.Forms.TreeNode]::new()
-                $type = $p.GetType().Name
-                $node.Text = "[$i][$type]"
 
-                $taggedType = $type
-                $color = "#CD9C6C"
-                if ($p -is [Ast]) { 
-                    if ($this.astColorsMap.ContainsKey($type)) { $color = $this.astColorsMap[$type] }
-                    $taggedType = "<b>$taggedType</b>" 
-                }
-                $node.Tag = @{
-                    Parameter = $p
-                    NameParts = $this.tagParser.Parse("[$i]<color:#C480DC>[</color><color:$color>$taggedType</color><color:#C480DC>]</color>")
-                }
-                if ($p -and -not $this.isValuePrimitive($p)) { $node.Nodes.Add("[Loading...]") }
-                $parentNode.Nodes.Add($node)
-                $i++
+        if ($this.processArrayProperty($obj, $parentNode)) { return }
+        $this.processObjProperty($obj, $parentNode)
+        $this.processMethodsProperty($obj, $parentNode)
+    }
+
+    # Add array property node
+    [boolean]processArrayProperty([object]$obj, $parentNode) {
+        if ($obj -isnot [System.Collections.IEnumerable] -or $obj -is [string]) { return $false }
+       
+        $i = 0
+        foreach ($p in $obj) {
+            $node = [System.Windows.Forms.TreeNode]::new()
+            $type = $p.GetType().Name
+            $node.Text = "[$i][$type]"
+
+            $taggedType = $type
+            $color = "#CD9C6C"
+            if ($p -is [Ast]) { 
+                if ($this.astColorsMap.ContainsKey($type)) { $color = $this.astColorsMap[$type] }
+                $taggedType = "<b>$taggedType</b>" 
             }
-            
-            return
+            $node.Tag = @{
+                Parameter = $p
+                NameParts = $this.tagParser.Parse("[$i]<color:#C480DC>[</color><color:$color>$taggedType</color><color:#C480DC>]</color>")
+            }
+            if ($p -and -not $this.isValuePrimitive($p)) { $node.Nodes.Add("[Loading...]") }
+            $parentNode.Nodes.Add($node)
+            $i++
         }
 
+        return $true
+    }
+
+    # Add object property node
+    [void]processObjProperty([object]$obj, $parentNode) {
         foreach ($p in ([PSObject]$obj).PSObject.Properties) {
             $type = $this.getPropertyType($p)
             $val = $this.getPropertyValue($p)
             $name = $p.Name
+            $taggedType = $type
             $taggedName = $name
-            if ($p.Value -is [Ast]) { $taggedName = "<b>$name</b>" }
-            $taggedText = "<color:#C480DC>[</color><color:#CD9C6C>$type</color><color:#C480DC>]</color> $taggedName"
+            $color = "#CD9C6C"
+            if ($p.Value -is [Ast]) { 
+                if ($this.astColorsMap.ContainsKey($type)) { $color = $this.astColorsMap[$type] }
+                $taggedType = "<b>$type</b>" 
+                $taggedName = "<b>$name</b>"
+            }
+            $taggedText = "<color:#C480DC>[</color><color:$color>$taggedType</color><color:#C480DC>]</color> $taggedName"
             $nodeStr = "[$type] $name"
             if ($val) { 
                 $taggedText += ": <color:#4F4497>$val</color>" 
@@ -185,15 +202,59 @@ Class AstPropertyView {
         }
     }
 
+    [void]processMethodsProperty([object]$obj, $parentNode) {
+        #methods processing
+        $realMethods = ([PSObject]$obj).PSObject.Methods |  Where-Object {
+            $_.Name -notmatch '^(get_|set_)' -and
+            $_.Name -notin @('Equals', 'GetHashCode', 'GetType', 'ToString')
+        }
+
+        foreach ($m in $realMethods) {
+            $name = $this.removeNamespaces($m.toString())
+            $taggedName = $this.highlightMethodFullName($name)
+            $taggedText = "<color:#3477eb>Method</color>: $taggedName"
+            $node = [System.Windows.Forms.TreeNode]::new()
+            $node.Text = "Method: $name"
+            $node.Tag = @{
+                Parameter = $m
+                NameParts = $this.tagParser.Parse($taggedText)
+            }
+            $parentNode.Nodes.Add($node)
+        }
+    }
+
     [bool]isValuePrimitive([object]$val) {
         return  $val -is [string] -or $val.GetType().IsPrimitive -or $val -is [type] -or $val -is [ITypeName]
+    }
+
+    [string]removeNamespaces([string]$str) {
+        # Pattern: match full type name with dots and keep only last identifier
+        $pattern = '\b(?:[A-Za-z_][\w]*\.)+([A-Za-z_][\w]*)\b'
+
+        return [regex]::Replace($str, $pattern, { param($m) $m.Groups[1].Value })
+    }
+
+    [string]highlightMethodFullName([string] $str) {
+        # Highlight method types
+        $str =  [regex]::Replace(
+            $str,
+            '(?<type>[A-Za-z_]\w*(\[[^\]]+\])?)(?=\s+[A-Za-z_]\w*)',
+            '<color:#C480DC>[</color><color:#CD9C6C>${type}</color><color:#C480DC>]</color>'
+        ) 
+
+        # Highlight method names
+        return [regex]::Replace(
+            $str,
+            '\b([A-Za-z_]\w*)\s*(?=\()',
+            '<b>$1</b>'
+        )
     }
 
     [string]getPropertyType([object]$prop) {
         $typeName = [Microsoft.PowerShell.ToStringCodeMethods]::Type([type]$prop.TypeNameOfValue)
         if ($typeName -match '.*ReadOnlyCollection\[(.*)\]') { $typeName = $matches[1] + '[]' }
         # Remove the namespace
-        $typeName = $typeName -replace '.*\.', ''
+        $typeName = $this.removeNamespaces($typeName) #$typeName -replace '.*\.', ''
         return $typeName
     }
 

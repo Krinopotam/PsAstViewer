@@ -149,6 +149,7 @@ Class ProgressBar {
                     $progressForm.Close()
                     $progressForm.Dispose()
                 }
+
             }, @($this.ProgressForm, $this.mainForm)
         )
     }

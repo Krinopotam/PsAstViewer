@@ -10,6 +10,12 @@ Class AstModel {
         $this.init($Script)
     }
 
+    AstModel([Ast]$astRoot, [bool]$includeNested) {
+        $this.script = $astRoot.Extent.Text -replace "`r`n", "`n" 
+        $this.ast = $astRoot
+        $this.astMap = $this.getAstHierarchyMap($astRoot, $includeNested)
+    }
+
     static [AstModel] FromFile([string]$Path) {
         if (-not (Test-Path $Path)) { throw "File not found: $Path" }
         $text = Get-Content -Raw -LiteralPath $Path -Encoding UTF8
@@ -18,6 +24,10 @@ Class AstModel {
 
     static [AstModel] FromScript([string]$Script) {
         return [AstModel]::new($Script)
+    }
+
+    static [AstModel] FromAst([Ast]$astRoot, [bool]$includeNested) {
+        return [AstModel]::new($astRoot, $includeNested)
     }
     
     [void]init([string]$script) {
@@ -30,7 +40,7 @@ Class AstModel {
             #if ($errors) { throw "Parsing failed" }
 
             $this.ast = $scriptAst
-            $this.astMap = $this.getAstHierarchyMap($scriptAst)
+            $this.astMap = $this.getAstHierarchyMap($scriptAst, $true)
         }
         catch {
             $this.ast = ""
@@ -42,10 +52,10 @@ Class AstModel {
     # Despite the descriptions, $ast.FindAll( { $true }, $false) returns not only direct children, but for some nodes unfolds their children in a flat list
     #    $ast.FindAll( { $true }, $false) is good to get all variables in scriptBlock, but can't get children scriptBlocks
     #    $ast.FindAll( { $true }, $true) returns all nodes in hierarchy, not only direct children
-    [System.Collections.Specialized.OrderedDictionary]getAstHierarchyMap([Ast]$rootAst) {
+    [System.Collections.Specialized.OrderedDictionary]getAstHierarchyMap([Ast]$rootAst, $includeNested = $true) {
         $map = [ordered]@{}
 
-        $items = $rootAst.FindAll( { $true }, $true)
+        $items = $rootAst.FindAll( { $true }, $includeNested)
         $this.nodesCount = $items.Count
         foreach ($item in $items) {
             if (-not $item.Parent) { continue }

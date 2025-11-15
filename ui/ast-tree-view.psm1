@@ -9,14 +9,17 @@ Class AstTreeView {
     [System.Windows.Forms.Control]$container
     [System.Windows.Forms.TreeView]$instance
     [System.Windows.Forms.TreeView]$dummyInstance
+    [System.Windows.Forms.Button]$clearFilterButton
     [AstModel]$astModel
     [NodeDrawer]$nodeDrawer
     [TextTagParser]$tagParser
     [bool]$inUpdate
     [bool]$isUpdatedFromViewBox
     [hashtable]$astColorsMap
+    [bool]$inlined
 
-    AstTreeView([object]$mainForm, [System.Windows.Forms.Control]$container, [hashtable]$astColorsMap) {
+    AstTreeView([object]$mainForm, [System.Windows.Forms.Control]$container, [hashtable]$astColorsMap, [bool]$inlined) {
+        $this.inlined = $inlined
         $this.mainForm = $mainForm
         $this.container = $container
         $this.astColorsMap = $astColorsMap
@@ -35,6 +38,7 @@ Class AstTreeView {
         $this.container.Controls.Add($label)
 
         $treeView = [System.Windows.Forms.TreeView]::new()
+        $treeView.Tag = $this
         $treeView.Name = "treeAstView"
         $treeView.Top = $label.Bottom
         $treeView.Left = 10
@@ -47,22 +51,13 @@ Class AstTreeView {
         #$treeView.ShowNodeToolTips = $true
         $this.container.Controls.Add($treeView)
 
-        $treeView.Tag = $this
-        $treeView.Add_AfterSelect({ 
-                param($s, $e)
-                $self = $s.Tag
-                $node = $e.Node
-                $keepCaretPos = $false
-                if ($self.isUpdatedFromViewBox) { $keepCaretPos = $true }
-                $self.mainForm.onAstNodeSelected($node.Tag.Ast, $node.Tag.Index, $keepCaretPos)
-            })
+        $this.InitEvents($treeView) 
+                    
+        if (-not $this.inlined) { 
+            $this.initContextMenu($treeView)
+        }
 
-        $treeView.Add_DrawNode({
-                param($s, $e)
-                if ($s.Tag.inUpdate) { return }
-                $s.Tag.nodeDrawer.drawNode($s, $e, $e.Node.Tag.NameParts)
-            })
-
+        # Dummy TreeView to be used when the real TreeView is not visible
         $dummyTreeView = [System.Windows.Forms.TreeView]::new()
         $dummyTreeView.Name = "dummyTreeView"
         $dummyTreeView.Top = $treeView.Top
@@ -75,7 +70,66 @@ Class AstTreeView {
         $this.container.Controls.Add($dummyTreeView)
         $this.dummyInstance = $dummyTreeView
 
+        # Clear filter button
+        $this.clearFilterButton = [System.Windows.Forms.Button]::new()
+        $this.clearFilterButton.Tag = $this
+        $this.clearFilterButton.Name
+        $this.clearFilterButton.Width = 100
+        $this.clearFilterButton.Top = 10
+        $this.clearFilterButton.Visible = $false
+        $this.clearFilterButton.Text = "Clear filter"
+        $this.clearFilterButton.Left = $this.container.ClientSize.Width - $this.clearFilterButton.Width - 10
+        $this.clearFilterButton.ForeColor = [System.Drawing.Color]::Blue
+        $this.clearFilterButton.Anchor = "Top, Right"
+        $this.clearFilterButton.Add_Click({
+                param($s, $e)
+                $self = $s.Tag
+                $self.clearFilterButton.Visible = $false
+                $self.mainForm.onFilterCleared()
+            })
+        $this.container.Controls.Add($this.clearFilterButton)
+
         return $treeView
+    }
+
+    [void]initEvents( [System.Windows.Forms.TreeView]$treeView) {
+        if (-not $this.inlined) { 
+            $treeView.Add_AfterSelect({ 
+                    param($s, $e)
+                    $self = $s.Tag
+                    $node = $e.Node
+                    $keepCaretPos = $false
+                    if ($self.isUpdatedFromViewBox) { $keepCaretPos = $true }
+                    $self.mainForm.onAstNodeSelected($node.Tag.Ast, $node.Tag.Index, $keepCaretPos)
+                })
+        }
+
+        $treeView.Add_DrawNode({
+                param($s, $e)
+                if ($s.Tag.inUpdate) { return }
+                $s.Tag.nodeDrawer.drawNode($s, $e, $e.Node.Tag.NameParts)
+            })
+    }
+
+
+    [void]initContextMenu([System.Windows.Forms.TreeView]$treeView) {
+        $menu = [System.Windows.Forms.ContextMenuStrip]::new()
+
+        $showFindAllUnnested = $menu.Items.Add("Show Ast.FindAll({...}, $false)")
+        $showFindAllUnnested.Add_Click({ 
+                param($s, $e)
+                # sender is a ToolStripMenuItem; get its ContextMenuStrip (owner)
+                $cms = $s.GetCurrentParent()
+                $ctrl = $cms.SourceControl
+                $node = $ctrl.SelectedNode
+                if (-not $node) { return }
+
+                $self = $ctrl.Tag
+                $curAst = $node.Tag.Ast
+                $self.mainForm.showFindAllCommandView($curAst, $false)
+            })
+
+        $treeView.ContextMenuStrip = $menu
     }
 
     [void]setAstModel([AstModel]$astModel, [ProgressBar]$pb) {
@@ -83,6 +137,8 @@ Class AstTreeView {
         $this.astModel = $astModel
         $this.FillTreeView($astModel, $pb)
         #$this.instance.ExpandAll()
+        $this.clearFilterButton.Visible = $null -ne $this.mainForm.filteredAstModel
+
         $this.ExpandNodesToLevel($this.instance.Nodes, 2)
         if ($this.instance.Nodes.Count -gt 0) {
             $this.instance.SelectedNode = $this.instance.Nodes[0]

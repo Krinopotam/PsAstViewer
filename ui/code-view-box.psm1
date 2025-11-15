@@ -120,12 +120,12 @@ Class CodeViewBox {
                 $ctrl = $self.mainForm.ctrlPressed
                 if ($e.Button -eq [System.Windows.Forms.MouseButtons]::Left -and $ctrl) {
                     $charIndex = $s.GetCharIndexFromPosition($e.Location)
-                    $self.onCharIndexSelected($charIndex)
+                    $self.onCharIndexSelected($charIndex + $self.mainForm.filteredOffset)
                 }
 
                 if ($e.Button -eq [System.Windows.Forms.MouseButtons]::Right) {
-                    $charIndex = $s.GetCharIndexFromPosition($e.Location)
-                    if ($charIndex -ge 0 -and $charIndex -lt $s.TextLength -and $s.SelectionLength -eq 0) { $s.Select($charIndex, 0) }
+                    $charIndex = $s.GetCharIndexFromPosition($e.Location) 
+                    if ($charIndex -ge 0 -and $charIndex -lt $s.TextLength -and $s.SelectionLength -eq 0) { $s.Select($charIndex + $self.mainForm.filteredOffset, 0) }
                 }
             })
 
@@ -179,15 +179,15 @@ Class CodeViewBox {
         if ($null -eq $this.selectedAst) { return }
 
         # Primary range (must exist)
-        [int]$primaryStart = $this.selectedAst.Extent.StartOffset
-        [int]$primaryEnd = $this.selectedAst.Extent.EndOffset
+        [int]$primaryStart = $this.selectedAst.Extent.StartOffset - $this.mainForm.filteredOffset
+        [int]$primaryEnd = $this.selectedAst.Extent.EndOffset - $this.mainForm.filteredOffset
 
         # Secondary range
         [int]$secondaryStart = 0
         [int]$secondaryEnd = 0
         if ($this.selectedAstSecondary) {
-            $secondaryStart = [int]$this.selectedAstSecondary.Extent.StartOffset
-            $secondaryEnd = [int]$this.selectedAstSecondary.Extent.EndOffset
+            $secondaryStart = [int]$this.selectedAstSecondary.Extent.StartOffset - $this.mainForm.filteredOffset
+            $secondaryEnd = [int]$this.selectedAstSecondary.Extent.EndOffset - $this.mainForm.filteredOffset
         }
 
         # Only primary highlight and exit
