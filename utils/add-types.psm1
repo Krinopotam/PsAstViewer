@@ -18,3 +18,4 @@ public static class Keyboard {
     public static extern short GetAsyncKeyState(int key);
 }
 "@
+

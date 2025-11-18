@@ -1,5 +1,6 @@
 ﻿using module .\progress-bar.psm1
 using module ..\models\ast-model.psm1
+using module .\search-panel.psm1
 using namespace System.Management.Automation.Language
 
 Class CodeViewBox {
@@ -11,11 +12,13 @@ Class CodeViewBox {
     [Ast]$selectedAstSecondary
     [string]$currentText
     [bool]$suppressTextChanged
+    [SearchPanel]$searchPanel
     
     CodeViewBox([object]$mainForm, [System.Windows.Forms.Control]$container) {
         $this.mainForm = $mainForm
         $this.container = $container
         $this.instance = $this.Init()
+        $this.searchPanel = [SearchPanel]::new($this, $this.instance)
     }    
 
     [System.Windows.Forms.RichTextBox]Init() {
@@ -25,7 +28,7 @@ Class CodeViewBox {
         $label.Top = 20
         $label.Left = 2
         $label.Height = 20
-        $label.Width=60
+        $label.Width = 60
         $this.container.Controls.Add($label)
 
         $textBox = [System.Windows.Forms.RichTextBox]::new()
@@ -126,6 +129,16 @@ Class CodeViewBox {
                 if ($e.Button -eq [System.Windows.Forms.MouseButtons]::Right) {
                     $charIndex = $s.GetCharIndexFromPosition($e.Location) 
                     if ($charIndex -ge 0 -and $charIndex -lt $s.TextLength -and $s.SelectionLength -eq 0) { $s.Select($charIndex + $self.mainForm.filteredOffset, 0) }
+                }
+            })
+
+        $textBox.Add_KeyDown({
+                param($s, $e)
+                $self = $s.Tag
+
+                if ($e.Control -and $e.KeyCode -eq [System.Windows.Forms.Keys]::F) {
+                    $self = $s.Tag
+                    $self.searchPanel.toggle()
                 }
             })
 
@@ -263,12 +276,15 @@ Class CodeViewBox {
     }
    
     [void]DisableRedraw() {
+        $this.instance.SuspendLayout()
         $wmSetRedraw = 0xB
         [Win32]::SendMessage($this.instance.Handle, $wmSetRedraw, $false, 0)
+
     }
     [void]EnableRedraw() {
         $wmSetRedraw = 0xB
         [Win32]::SendMessage($this.instance.Handle, $wmSetRedraw, $true, 0)
+        $this.instance.ResumeLayout()
         $this.instance.Refresh()
     }
 
@@ -289,6 +305,87 @@ Class CodeViewBox {
   
     [void]onCharIndexSelected([int]$charIndex) {
         $this.mainForm.onCharIndexSelected($charIndex)
+    }
+
+    [void]onSearch([string]$text, [string]$direction) {
+        if ([string]::IsNullOrWhiteSpace($text)) { return }
+
+        $full = $this.instance.Text
+        if ([string]::IsNullOrEmpty($full)) { return }
+
+        # Reset if new search text
+        <#         if ($this.LastText -ne $text) {
+            $this.LastText = $text
+            # move cursor to top so search always starts clean
+            $this.instance.SelectionStart = 0
+        } #>
+        
+
+        $curr = $this.instance.SelectionStart
+        $index = -1
+
+        switch ($direction) {
+
+            '' {
+                # first search from beginning
+                $index = $full.IndexOf($text, $curr, [StringComparison]::'InvariantCultureIgnoreCase')
+            }
+
+            'next' {
+                $start = $curr + 1
+                if ($start -ge $full.Length) { $start = 0 }
+                $index = $full.IndexOf($text, $start, [StringComparison]::'InvariantCultureIgnoreCase')
+                if ($index -lt 0) { $index = $full.IndexOf($text, 0, [StringComparison]::'InvariantCultureIgnoreCase') }
+            }
+
+            'prev' {
+                $start = $curr - 1
+                if ($start -lt 0) { $start = $full.Length - 1 }
+                $index = $full.LastIndexOf($text, $start, [StringComparison]::'InvariantCultureIgnoreCase')
+                if ($index -lt 0) { $index = $full.LastIndexOf($text, $full.Length - 1, [StringComparison]::'InvariantCultureIgnoreCase') }
+            }
+        }
+
+        if ($index -lt 0) { return }
+
+        # highlight found match
+        $this.instance.SelectAll()
+        $this.instance.SelectionBackColor = [System.Drawing.Color]::White
+
+        $this.instance.Select($index, $text.Length)
+        $this.instance.SelectionBackColor = [System.Drawing.Color]::Yellow
+        $this.instance.ScrollToCaret()
+
+
+
+
+        <#         $this.DisableRedraw()
+        $rtb = $this.instance
+        $rtb.SelectAll()
+        $rtb.SelectionBackColor = [System.Drawing.Color]::White
+
+        $search = $text
+        if ([string]::IsNullOrWhiteSpace($search)) { return }
+
+        # Find all occurrences
+        $startIndex = 0
+        while ($true) {
+            # Find next index
+            $index = $rtb.Text.IndexOf($search, $startIndex, [StringComparison]::InvariantCultureIgnoreCase)
+
+            if ($index -lt 0) { break }
+
+            # Highlight match
+            $rtb.Select($index, $search.Length)
+            $rtb.SelectionBackColor = [System.Drawing.Color]::Yellow
+
+            # Move past the current match
+            $startIndex = $index + $search.Length
+        }
+
+        # Reset selection
+        $rtb.Select(0, 0)
+        $this.EnableRedraw() #>
     }
 
 }
