@@ -37,7 +37,7 @@ Class AstPropertyView {
         $treeView.Name = "treePropView"
         $treeView.Top = $label.Bottom
         $treeView.Left = 10
-        $treeView.Height = $this.container.ClientSize.Height - $label.Bottom - 12
+        $treeView.Height = $this.container.ClientSize.Height - $label.Bottom - 25
         $treeView.Width = $this.container.ClientSize.Width - 12
         $treeView.Anchor = "Top, Bottom, Left, Right"
         $treeView.Font = New-Object System.Drawing.Font("Courier New", 12)

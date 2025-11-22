@@ -1,22 +1,45 @@
 ﻿using module .\progress-bar.psm1
 using module ..\models\ast-model.psm1
 using module .\search-panel.psm1
+using module .\code-status-bar.psm1
+using module ..\utils\debounce.psm1
 using namespace System.Management.Automation.Language
 
+$global:MyCounter = 0
 Class CodeViewBox {
+    # Main form instance
     [object]$mainForm # can't use type [MainForm] due to circular dependency
+    # Parent container instance
     [System.Windows.Forms.Control]$container
+    # RichTextBox instance
     [System.Windows.Forms.RichTextBox]$instance
-    [AstModel]$astModel
-    [Ast]$selectedAst
-    [Ast]$selectedAstSecondary
-    [string]$currentText
-    [bool]$suppressTextChanged
+    # Search panel instance
     [SearchPanel]$searchPanel
+    # Code status bar instance
+    [CodeStatusBar]$codeStatusBar
+    # Debounce class instance for CodeStatusBar
+    [Debounce]$statusDebounce
+    # Current Ast model
+    [AstModel]$astModel
+    # Current selected Ast node
+    [Ast]$selectedAst
+    # Current selected secondary Ast node
+    [Ast]$selectedAstSecondary
+    # Current found block (substring) info {text, start, end}
+    [hashtable]$foundBlock
+    # Current entered text
+    [string]$currentText
+    # Flag to suppress TextChanged event
+    [bool]$suppressTextChanged
+    # Flag to suppress SelectionChanged event
+    [bool]$suppressSelectionChanged
+    # Flag to indicate if CodeViewBox is focused
+    [bool]$isFocused
     
     CodeViewBox([object]$mainForm, [System.Windows.Forms.Control]$container) {
         $this.mainForm = $mainForm
         $this.container = $container
+        $this.statusDebounce = [Debounce]::new(100)
         $this.instance = $this.Init()
         $this.searchPanel = [SearchPanel]::new($this, $this.instance)
     }    
@@ -35,7 +58,7 @@ Class CodeViewBox {
         $textBox.Name = "txtCodeViewBox"
         $textBox.Top = $label.Bottom
         $textBox.Left = 2
-        $textBox.Height = $this.container.ClientSize.Height - $label.Bottom - 10
+        $textBox.Height = $this.container.ClientSize.Height - $label.Bottom - 25
         $textBox.Width = $this.container.ClientSize.Width - 12
         $textBox.Multiline = $true          
         $textBox.WordWrap = $true
@@ -45,6 +68,8 @@ Class CodeViewBox {
         $textBox.Anchor = "Top, Bottom, Left, Right"
         $textBox.Tag = $this
         $this.container.Controls.Add($textBox)
+
+        $this.codeStatusBar = [CodeStatusBar]::new($this.mainForm, $this.container, $this)
 
         $btnLoadScript = [System.Windows.Forms.Button]::new()
         $btnLoadScript.Text = "Load Script"
@@ -61,7 +86,7 @@ Class CodeViewBox {
             })
         $this.container.Controls.Add($btnLoadScript)
 
-        $menu = New-Object System.Windows.Forms.ContextMenuStrip
+        $menu = [System.Windows.Forms.ContextMenuStrip]::new()
 
         $findInAstItem = $menu.Items.Add("Find in AST Tree View   (ctrl+click)")
         $findInAstItem.Add_Click({ 
@@ -69,51 +94,61 @@ Class CodeViewBox {
                 # sender is a ToolStripMenuItem; get its ContextMenuStrip (owner)
                 $cms = $s.GetCurrentParent()
                 $rtb = $cms.SourceControl
-                $charIndex = $rtb.SelectionStart
-                $rtb.Tag.onCharIndexSelected($charIndex)
+                $charPos = $rtb.SelectionStart
+                $rtb.Tag.selectAstNodeByCharPos($charPos)
             })
 
         # Навешиваем меню
         $textBox.ContextMenuStrip = $menu
 
+        $this.initEvents($textBox)
+
+        return $textBox
+    }
+
+    [void]initEvents([System.Windows.Forms.RichTextBox]$textBox) {
+        $textBox.add_SelectionChanged({
+                param($s, $e)
+                if ($s.Tag.suppressSelectionChanged) { return }
+                $s.Tag.statusDebounce.run({ param($self, [int]$pos) $self.showCurrentToken($pos) }, @($s.Tag, $s.SelectionStart))
+            })
+
         $textBox.add_TextChanged({
                 param($s, $e)
                 $self = $s.Tag
-                if ($self.suppressTextChanged) { return }
+                if ($self.currentText -eq $s.Text) { return }
                 $self.currentText = $s.Text
+                $self.searchPanel.invokeDebouncedSearch("", $true, 0)
             })
 
         $textBox.Add_Leave({
                 param($s, $e)
                 $self = $s.Tag
-                if ($self.currentText -ne $self.astModel.script) {
-                    if ($self.currentText) {
-                        $result = [System.Windows.Forms.MessageBox]::Show("Script text has changed. Recreate AST tree or cancel changes?",
-                            "Confirm",
-                            [System.Windows.Forms.MessageBoxButtons]::OKCancel,
-                            [System.Windows.Forms.MessageBoxIcon]::Question
-                        )
+                $self.isFocused = $false
+                $self.highlightText($null)
+                if (-not $self.isCodeChanged()) { return }
+                
+                if ($self.currentText) {
+                    $result = [System.Windows.Forms.MessageBox]::Show("Script text has changed. Recreate AST tree or cancel changes?",
+                        "Confirm",
+                        [System.Windows.Forms.MessageBoxButtons]::OKCancel,
+                        [System.Windows.Forms.MessageBoxIcon]::Question
+                    )
 
-                        if ($result -eq [System.Windows.Forms.DialogResult]::OK) { $self.mainForm.onCodeChanged($self.currentText) }
-                        else { $self.instance.Text = $self.astModel.script }
-                    }
-                    return
+                    if ($result -eq [System.Windows.Forms.DialogResult]::OK) { $self.mainForm.onCodeChanged($self.currentText) }
+                    else { $self.instance.Text = $self.astModel.script }
                 }
+                else {
+                    $self.mainForm.onCodeChanged($self.currentText)
+                }
+
             })
 
         $textBox.Add_GotFocus({
                 param($s, $e)
-                $rtb = $s.Tag.instance
-                $selStart = $rtb.SelectionStart
-                $selLength = $rtb.SelectionLength
-
-                # Highlight reset (set background for all text)
-                $rtb.SelectAll()
-                $rtb.SelectionColor = [System.Drawing.Color]::Black
-                $rtb.SelectionBackColor = [System.Drawing.Color]::White
-
-                # Return cursor position
-                $rtb.Select($selStart, $selLength)
+                $self = $s.Tag
+                $self.isFocused = $true
+                $self.highlightText($null)
             })
 
         $textBox.Add_MouseDown({
@@ -122,8 +157,8 @@ Class CodeViewBox {
                 $self = $s.Tag
                 $ctrl = $self.mainForm.ctrlPressed
                 if ($e.Button -eq [System.Windows.Forms.MouseButtons]::Left -and $ctrl) {
-                    $charIndex = $s.GetCharIndexFromPosition($e.Location)
-                    $self.onCharIndexSelected($charIndex + $self.mainForm.filteredOffset)
+                    $charPos = $s.GetCharIndexFromPosition($e.Location) + $self.mainForm.filteredOffset
+                    $self.selectAstNodeByCharPos($charPos )
                 }
 
                 if ($e.Button -eq [System.Windows.Forms.MouseButtons]::Right) {
@@ -137,13 +172,11 @@ Class CodeViewBox {
                 $self = $s.Tag
 
                 if ($e.Control -and $e.KeyCode -eq [System.Windows.Forms.Keys]::F) {
-                    $self = $s.Tag
-                    $self.searchPanel.toggle()
+                    $selText = $self.getSelectedText().trim()
+                    if ($self.searchPanel.isVisible() -and -not $selText) { return }
+                    $self.searchPanel.show($true, $selText)
                 }
             })
-
-
-        return $textBox
     }
 
     [void]setAstModel([AstModel]$astModel, [ProgressBar]$pb) {
@@ -157,43 +190,36 @@ Class CodeViewBox {
     [void]onAstNodeSelected([Ast]$ast, [int]$index, [bool]$keepScrollPos) {
         $this.selectedAst = $ast
         $this.selectedAstSecondary = $null
-        $this.highlightText(-not $keepScrollPos)
+        $scrollBlockType = $null
+        if (-not $keepScrollPos) { $scrollBlockType = "PrimaryAst" }
+        $this.highlightText($scrollBlockType)
     }
 
     [void]onParameterSelected([object]$obj, [Ast]$ast) {
-        if ($ast) { $this.selectedAstSecondary = $ast }
-        else { $this.selectedAstSecondary = $null }
-        $this.highlightText($true)
+        $scrollBlockType = $null
+        $this.selectedAstSecondary = $null
+        if ($ast) { 
+            $this.selectedAstSecondary = $ast 
+            $scrollBlockType = "SecondaryAst"
+        }
+        $this.highlightText($scrollBlockType)
     }
 
-    [void]highlightText($scrollToCaret = $true) {
-        $rtb = $this.instance
+    # Returns array of hashtable {Start, End, Color, BgColor}, calculated from intersecting selectedAst and selectedAstSecondary extents positions
+    [hashtable[]]getAstHighlightedBlocks() {
+        if (-not $this.selectedAst -and -not $this.selectedAstSecondary) { return @() }
 
-        $scrollPos = $this.GetScrollPos()
-        $this.DisableRedraw()
-
-        # Colors
-        <# Green
-        $primaryColor = [System.Drawing.Color]::FromArgb(0, 100, 0)     # primary
-        $secondaryColor = [System.Drawing.Color]::FromArgb(1, 214, 65)   # secondary
-        $mixedColor = [System.Drawing.Color]::FromArgb(0, 172, 52)     # overlap #>
-        
-        # Blue
         $primaryColor = [System.Drawing.Color]::FromArgb(0, 0, 150)       # primary
-        $secondaryColor = [System.Drawing.Color]::FromArgb(35, 150, 230)    # secondary
-        $mixedColor = [System.Drawing.Color]::FromArgb(20, 95, 210)     # overlap
-
-        # Reset previous highlighting
-        $rtb.SelectAll()
-        $rtb.SelectionBackColor = [System.Drawing.Color]::White
-        $rtb.SelectionColor = [System.Drawing.Color]::Black
-        $rtb.DeselectAll()
-
-        if ($null -eq $this.selectedAst) { return }
+        $secondaryColor = [System.Drawing.Color]::FromArgb(35, 150, 230)  # secondary
+        $overlapColor = [System.Drawing.Color]::FromArgb(20, 95, 210)       # overlap
 
         # Primary range (must exist)
-        [int]$primaryStart = $this.selectedAst.Extent.StartOffset - $this.mainForm.filteredOffset
-        [int]$primaryEnd = $this.selectedAst.Extent.EndOffset - $this.mainForm.filteredOffset
+        [int]$primaryStart = 0
+        [int]$primaryEnd = 0
+        if ($this.selectedAst) {
+            [int]$primaryStart = $this.selectedAst.Extent.StartOffset - $this.mainForm.filteredOffset
+            [int]$primaryEnd = $this.selectedAst.Extent.EndOffset - $this.mainForm.filteredOffset            
+        }
 
         # Secondary range
         [int]$secondaryStart = 0
@@ -203,48 +229,140 @@ Class CodeViewBox {
             $secondaryEnd = [int]$this.selectedAstSecondary.Extent.EndOffset - $this.mainForm.filteredOffset
         }
 
-        # Only primary highlight and exit
-        if (-not $this.selectedAstSecondary) {
-            $this.SelectAndColor($primaryStart, $primaryEnd - $primaryStart, $primaryColor, [System.Drawing.Color]::White)
-            if ($scrollToCaret) { $this.ScrollToCaret() }
-            $rtb.DeselectAll()
-
-            if (-not $scrollToCaret) { $this.RestoreScrollPos($scrollPos) }
-
-            $this.EnableRedraw()
-            return
+        # Only primary highlight
+        if ($this.selectedAst -and -not $this.selectedAstSecondary) {
+            return @(@{ Type = "PrimaryAst"; Start = $primaryStart; End = $primaryEnd; Color = [System.Drawing.Color]::White; BgColor = $primaryColor })
+        }
+        
+        # Only secondary highlight 
+        if ( $this.selectedAstSecondary -and -not $this.selectedAst) {
+            return @(@{ Type = "SecondaryAst"; Start = $secondaryStart; End = $secondaryEnd; Color = [System.Drawing.Color]::White; BgColor = $secondaryColor })
         }
 
-        # Compute overlap (safe: secondaryStart/End are initialized above)
-        #[int]$minStart = [Math]::Min($primaryStart, $secondaryStart)
+        
+        # Check overlap
+        if ($primaryEnd -lt $secondaryStart -or $secondaryEnd -lt $primaryStart) {
+            # No overlap
+            return @(
+                @{ Type = "PrimaryAst"; Start = $primaryStart; End = $primaryEnd; Color = [System.Drawing.Color]::White; BgColor = $primaryColor },
+                @{ Type = "SecondaryAst"; Start = $secondaryStart; End = $secondaryEnd; Color = [System.Drawing.Color]::White; BgColor = $secondaryColor }
+            )
+        }
+
+        # Case: equal ranges -> return one block
+        if ($primaryStart -eq $secondaryStart -and $primaryEnd -eq $secondaryEnd) {
+            return @(@{ Type = "OverlapAst"; Start = $primaryStart; End = $primaryEnd; Color = [System.Drawing.Color]::White; BgColor = $overlapColor })
+        }
+
+        # Now we know: ranges overlap but are not equal
         [int]$overlapStart = [Math]::Max($primaryStart, $secondaryStart)
         [int]$overlapEnd = [Math]::Min($primaryEnd, $secondaryEnd)
-        [bool]$hasOverlap = $overlapEnd -gt $overlapStart
 
-        # Paint order: primary -> secondary -> overlap
-        $this.SelectAndColor($primaryStart, $primaryEnd - $primaryStart, $primaryColor, [System.Drawing.Color]::White)
-        $this.SelectAndColor($secondaryStart, $secondaryEnd - $secondaryStart, $secondaryColor, [System.Drawing.Color]::White)
-        if ($hasOverlap) { $this.SelectAndColor($overlapStart, $overlapEnd - $overlapStart, $mixedColor, [System.Drawing.Color]::White) }
+        $result = @()
+
+        # ----- Left block -----
+        [int]$leftStart = [Math]::Min($primaryStart, $secondaryStart)
+        [int]$leftEnd = $overlapStart
+
+        if ($leftStart -lt $leftEnd) {
+            $leftType = if ($primaryStart -lt $secondaryStart) { "PrimaryAst" } else { "SecondaryAst" }
+            $leftColor = if ($leftType -eq "PrimaryAst") { $primaryColor } else { $secondaryColor }
+
+            $result += @{ Type = $leftType; Start = $leftStart; End = $leftEnd; Color = [System.Drawing.Color]::White; BgColor = $leftColor }
+        }
+
+        # ----- Overlap block -----
+        if ($overlapEnd -gt $overlapStart) {
+            $result += @{ Type = "OverlapAst"; Start = $overlapStart; End = $overlapEnd; Color = [System.Drawing.Color]::White; BgColor = $overlapColor }
+        }
+
+        # ----- Right block -----
+        [int]$rightStart = $overlapEnd
+        [int]$rightEnd = [Math]::Max($primaryEnd, $secondaryEnd)
+
+        if ($rightStart -lt $rightEnd) {
+            $rightType = if ($primaryEnd -gt $secondaryEnd) { "PrimaryAst" } else { "SecondaryAst" }
+            $rightColor = if ($rightType -eq "PrimaryAst") { $primaryColor } else { $secondaryColor }
+            $result += @{Type = $rightType; Start = $rightStart; End = $rightEnd; Color = [System.Drawing.Color]::White; BgColor = $rightColor }
+        }
+
+        return $result
+    }
+
+    # Merge Ast positions blocks with found block. Found block has higher priority
+    [hashtable[]] MergeFoundBlock([hashtable[]] $astBlocks, [hashtable] $foundBlock) {
+
+        # If no found block -> return original
+        if (-not $foundBlock) { return $astBlocks }
+
+        [int]$foundStart = $foundBlock.Start
+        [int]$foundEnd = $foundBlock.End
+
+        $result = @()
+
+        foreach ($block in $astBlocks) {
+
+            [int]$bStart = $block.Start
+            [int]$bEnd = $block.End
+
+            # ---- No overlap ----
+            if ($bEnd -le $foundStart -or $foundEnd -le $bStart) {
+                # keep block unchanged
+                $result += $block
+                continue
+            }
+
+            # ---- Found fully covers block and skip it ----
+            if ($foundStart -le $bStart -and $foundEnd -ge $bEnd) { continue }
+
+            # ---- Partial overlap: split into left and right parts ----
+
+            # Left part (block before found)
+            if ($bStart -lt $foundStart) { $result += @{Type = $block.Type; Start = $bStart; End = $foundStart; Color = $block.Color; BgColor = $block.BgColor; } }
+
+            # Right part (block after found)
+            if ($bEnd -gt $foundEnd) { $result += @{Type = $block.Type; Start = $foundEnd; End = $bEnd; Color = $block.Color; BgColor = $block.BgColor } }
+        }
+
+        # Add found block itself (priority)
+        $result += $foundBlock
+
+        # Sort final output
+        return $result | Sort-Object Start
+    }
+
+    [void]highlightText([string]$scrollToBlock = $null) {
+        $this.suppressSelectionChanged = $true
+        $rtb = $this.instance
+
+        $currentPos = $rtb.SelectionStart
+        $scrollPos = $this.GetScrollPos()
+        $this.DisableRedraw()
+
+        # Reset previous highlighting
+        $rtb.SelectAll()
+        $rtb.SelectionBackColor = [System.Drawing.Color]::White
+        $rtb.SelectionColor = [System.Drawing.Color]::Black
+        $rtb.DeselectAll()
+
+        $blocks = @()
+        if (-not $this.isFocused) { $blocks = $this.getAstHighlightedBlocks() }
+        if ($this.foundBlock) { $blocks = $this.MergeFoundBlock($blocks, $this.foundBlock) }
         
-        $rtb.select($primaryStart, 0) # move caret to the start of the first highlight
-        if ($scrollToCaret) { $this.ScrollToCaret() }
+        foreach ($block in $blocks) {
+            if ($scrollToBlock -and $block.Type -eq $scrollToBlock) { $currentPos = $block.Start }
+            $rtb.Select($block.Start, $block.End - $block.Start)
+            $rtb.SelectionBackColor = $block.BgColor
+            $rtb.SelectionColor = $block.Color
+        }
+        $rtb.DeselectAll()
+        $rtb.Select($currentPos, 0)
+        if ($scrollToBlock) { $this.ScrollToCaret() }
         else { $this.RestoreScrollPos($scrollPos) }
 
         $this.EnableRedraw()
+        $this.suppressSelectionChanged = $false
     }
-
-    [void]selectAndColor([int]$start, [int]$length, [System.Drawing.Color]$backColor, [System.Drawing.Color]$foreColor) {
-        $textLen = $this.instance.TextLength
-        if ($textLen -le 0) { return }
-
-        $start = [Math]::Max(0, [Math]::Min($start, $textLen))
-        $length = [Math]::Max(0, [Math]::Min($length, $textLen - $start))
-        if ($length -le 0) { return }
-
-        $this.instance.Select($start, $length)
-        $this.instance.SelectionBackColor = $backColor
-        $this.instance.SelectionColor = $foreColor
-    } 
 
     [hashtable]GetScrollPos() {
         $wmUser = 0x400
@@ -303,25 +421,28 @@ Class CodeViewBox {
         $this.instance.ScrollToCaret()
     }
   
-    [void]onCharIndexSelected([int]$charIndex) {
-        $this.mainForm.onCharIndexSelected($charIndex)
+    # Find AST node by char position
+    [void]selectAstNodeByCharPos([int]$charPos) {
+        $this.mainForm.selectAstNodeByCharPos($charPos)
     }
 
-    [void]onSearch([string]$text, [string]$direction) {
-        if ([string]::IsNullOrWhiteSpace($text)) { return }
+    [void]onSearch([string]$text, [string]$direction) { 
+        $this.onSearch($text, $direction, $false, -1)
+    }
+
+    # Search substring
+    [void]onSearch([string]$text, [string]$direction, [bool]$keepScrollPos, [int]$searchStartPos) {
+        if (-not $text) { 
+            $this.foundBlock = $null
+            $this.highlightText($null)
+            return 
+        }
 
         $full = $this.instance.Text
-        if ([string]::IsNullOrEmpty($full)) { return }
-
-        # Reset if new search text
-        <#         if ($this.LastText -ne $text) {
-            $this.LastText = $text
-            # move cursor to top so search always starts clean
-            $this.instance.SelectionStart = 0
-        } #>
-        
-
+        if (-not $full) { return }
+   
         $curr = $this.instance.SelectionStart
+        if ($searchStartPos -ge 0) { $curr = $searchStartPos }
         $index = -1
 
         switch ($direction) {
@@ -329,6 +450,7 @@ Class CodeViewBox {
             '' {
                 # first search from beginning
                 $index = $full.IndexOf($text, $curr, [StringComparison]::'InvariantCultureIgnoreCase')
+                if ($index -lt 0) { $index = $full.IndexOf($text, 0, [StringComparison]::'InvariantCultureIgnoreCase') }
             }
 
             'next' {
@@ -346,46 +468,48 @@ Class CodeViewBox {
             }
         }
 
-        if ($index -lt 0) { return }
-
-        # highlight found match
-        $this.instance.SelectAll()
-        $this.instance.SelectionBackColor = [System.Drawing.Color]::White
-
-        $this.instance.Select($index, $text.Length)
-        $this.instance.SelectionBackColor = [System.Drawing.Color]::Yellow
-        $this.instance.ScrollToCaret()
-
-
-
-
-        <#         $this.DisableRedraw()
-        $rtb = $this.instance
-        $rtb.SelectAll()
-        $rtb.SelectionBackColor = [System.Drawing.Color]::White
-
-        $search = $text
-        if ([string]::IsNullOrWhiteSpace($search)) { return }
-
-        # Find all occurrences
-        $startIndex = 0
-        while ($true) {
-            # Find next index
-            $index = $rtb.Text.IndexOf($search, $startIndex, [StringComparison]::InvariantCultureIgnoreCase)
-
-            if ($index -lt 0) { break }
-
-            # Highlight match
-            $rtb.Select($index, $search.Length)
-            $rtb.SelectionBackColor = [System.Drawing.Color]::Yellow
-
-            # Move past the current match
-            $startIndex = $index + $search.Length
+        if ($index -ge 0) { 
+            $this.foundBlock = @{ Type = "Found"; Start = $index; End = $index + $text.Length; Color = [System.Drawing.Color]::Black; BgColor = [System.Drawing.Color]::Yellow }
+        }
+        else {
+            $this.foundBlock = $null
         }
 
-        # Reset selection
-        $rtb.Select(0, 0)
-        $this.EnableRedraw() #>
+        $scrollToBlock = $null
+        if (-not $keepScrollPos) { $scrollToBlock = "Found" }
+        $this.highlightText($scrollToBlock)
+    }
+
+    [string]getSelectedText() {
+        $res = $this.instance.SelectedText
+        if (-not $res) { $res = "" }
+        return $res
+    }
+
+    # Show current token in status bar
+    [void]showCurrentToken([int]$charIndex) {
+        if ($this.isCodeChanged()) { 
+            $this.codeStatusBar.update("Code changed, Ast needs to be rebuilt")
+            return 
+        }
+
+        $token = $this.astModel.GetTokenByCharIndex($charIndex)
+        $tokenName = ""
+        $tokenFlags = ""
+        if ($token) {
+            $tokenName = "Token: " + $token.Kind
+            if ($token.TokenFlags) { 
+                $tokenFlags = $token.TokenFlags -join ", " 
+                $tokenFlags = "; flags: $tokenFlags"
+            }
+        }
+
+        $this.codeStatusBar.update("$tokenName$tokenFlags")
+    }
+
+    # Returns true if text changed and Ast tree needs to be rebuilt
+    [bool]isCodeChanged() {
+        return $this.currentText -ne $this.astModel.script
     }
 
 }

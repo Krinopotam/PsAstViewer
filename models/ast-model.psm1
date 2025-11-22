@@ -2,6 +2,7 @@
 
 Class AstModel {
     [Ast]$ast
+    [Token[]]$tokens
     [hashtable]$astMap
     [string]$script
     [int]$nodesCount
@@ -36,10 +37,12 @@ Class AstModel {
             $this.script = $script -replace "`r`n", "`n" 
         
             $errors = $null
-            $scriptAst = [Parser]::ParseInput($this.script, [ref]$null, [ref]$errors)
+            $tokensVal = $null
+            $scriptAst = [Parser]::ParseInput($this.script, [ref]$tokensVal, [ref]$errors)
             #if ($errors) { throw "Parsing failed" }
 
             $this.ast = $scriptAst
+            $this.tokens = $tokensVal
             $this.astMap = $this.getAstHierarchyMap($scriptAst, $true)
         }
         catch {
@@ -140,5 +143,41 @@ Class AstModel {
         }
 
         return $bestNode
+    }
+
+    [Token]GetTokenByCharIndex([int]$charIndex) {
+        if (-not $this.Tokens) { return $null }
+
+        [int]$low = 0
+        [int]$high = $this.Tokens.Length - 1
+
+        while ($low -le $high) {
+            # compute mid index
+            [int]$mid = ($low + $high) / 2
+
+            # local token reference
+            [Token]$t = $this.Tokens[$mid]
+
+            # get extents as integers
+            [int]$start = $t.Extent.StartOffset
+            [int]$end = $t.Extent.EndOffset   # EndOffset is exclusive
+
+            if ($charIndex -lt $start) {
+                # go left
+                $high = $mid - 1
+                continue
+            }
+
+            if ($charIndex -ge $end) {
+                # go right
+                $low = $mid + 1
+                continue
+            }
+
+            # found: charIndex [start, end)
+            return $t
+        }
+
+        return $null
     }
 }

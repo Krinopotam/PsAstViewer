@@ -206,9 +206,9 @@ Class MainForm {
         $this.setAstModel($this.loadedAstModel)
     }
 
-    [void]onCharIndexSelected([int]$charIndex) {
+    [void]selectAstNodeByCharPos([int]$charPos) {
         $this.astTreeView.instance.Focus()
-        $this.astTreeView.selectNodeByCharIndex($charIndex)
+        $this.astTreeView.selectNodeByCharIndex($charPos)
     }
 
     # Set Ast filter by $ast.FindAll()
