@@ -94,7 +94,7 @@ An **editable text box** showing the PowerShell source code.
 - When you select an AST node in the tree, the corresponding code region is **highlighted** in this view.  
 - If you select another AST node via the properties panel, its code range is **additionally highlighted**, making overlapping regions visible.  
 - When you **Ctrl + Click** (or use right click context menu) anywhere in the code editor, the viewer automatically determines which AST node corresponds to that position, selects it in the tree, and highlights its range in the code.  
-- Use **Ctrl + F** to search
+- Use **Ctrl + F** to search.
 - The status bar displays information about the token located at the current cursor position (current char index, token kind, flags)
 You can edit the script directly in the **Code View** pane — changes will trigger automatic AST regeneration.
 
