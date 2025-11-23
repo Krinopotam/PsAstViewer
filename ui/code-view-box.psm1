@@ -176,6 +176,10 @@ Class CodeViewBox {
                     if ($self.searchPanel.isVisible() -and -not $selText) { return }
                     $self.searchPanel.show($true, $selText)
                 }
+                elseif ($e.KeyCode -eq [System.Windows.Forms.Keys]::Escape) {
+                    if (-not $self.searchPanel.isVisible()) { return }
+                    $self.searchPanel.show($false)
+                }
             })
     }
 
@@ -209,9 +213,9 @@ Class CodeViewBox {
     [hashtable[]]getAstHighlightedBlocks() {
         if (-not $this.selectedAst -and -not $this.selectedAstSecondary) { return @() }
 
-        $primaryColor = [System.Drawing.Color]::FromArgb(0, 0, 150)       # primary
-        $secondaryColor = [System.Drawing.Color]::FromArgb(35, 150, 230)  # secondary
-        $overlapColor = [System.Drawing.Color]::FromArgb(20, 95, 210)       # overlap
+        $primaryColor = [System.Drawing.Color]::FromArgb(0, 120, 215)      # primary
+        $secondaryColor = [System.Drawing.Color]::FromArgb(61, 160, 236)   # secondary
+        $overlapColor = [System.Drawing.Color]::FromArgb(0, 99, 174)       # overlap
 
         # Primary range (must exist)
         [int]$primaryStart = 0
@@ -473,7 +477,7 @@ Class CodeViewBox {
         }
 
         if ($index -ge 0) { 
-            $this.foundBlock = @{ Type = "Found"; Start = $index; End = $index + $text.Length; Color = [System.Drawing.Color]::Black; BgColor = [System.Drawing.Color]::Yellow }
+            $this.foundBlock = @{ Type = "Found"; Start = $index; End = $index + $text.Length; Color = [System.Drawing.Color]::Black; BgColor = [System.Drawing.Color]::FromArgb(255, 245, 170) }
         }
         else {
             $this.foundBlock = $null
