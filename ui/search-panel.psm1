@@ -188,6 +188,10 @@ Class SearchPanel {
         $this.txtSearch.Text = $text
     }
 
+    [void]invokeDebouncedSearch([string]$direction, [bool]$keepScrollPos) {
+        $this.invokeDebouncedSearch($direction, $keepScrollPos, -1)
+    }
+    
     # Debounced search rerun if visible
     [void]invokeDebouncedSearch([string]$direction, [bool]$keepScrollPos, [int]$searchStartPos) {
         if (-not $this.isVisible()) { return }

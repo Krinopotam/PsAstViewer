@@ -118,7 +118,7 @@ Class CodeViewBox {
                 $self = $s.Tag
                 if ($self.currentText -eq $s.Text) { return }
                 $self.currentText = $s.Text
-                $self.searchPanel.invokeDebouncedSearch("", $true, 0)
+                $self.searchPanel.invokeDebouncedSearch("Current", $true)
             })
 
         $textBox.Add_Leave({
@@ -442,6 +442,10 @@ Class CodeViewBox {
         if (-not $full) { return }
    
         $curr = $this.instance.SelectionStart
+        if ($direction -eq "Current" -and $this.foundBlock) { 
+            $curr =[Math]::Min($curr,  $this.foundBlock.Start) 
+            $direction=""
+        }
         if ($searchStartPos -ge 0) { $curr = $searchStartPos }
         $index = -1
 
