@@ -114,7 +114,7 @@ Class AstTreeView {
     [void]initContextMenu([System.Windows.Forms.TreeView]$treeView) {
         $menu = [System.Windows.Forms.ContextMenuStrip]::new()
 
-        $showFindAllUnnested = $menu.Items.Add("Filtered Shallow View (FindAll nested = false)")
+        $showFindAllUnnested = $menu.Items.Add("Shallow FindAll Result")
         $showFindAllUnnested.Add_Click({ 
                 param($s, $e)
                 # sender is a ToolStripMenuItem; get its ContextMenuStrip (owner)
