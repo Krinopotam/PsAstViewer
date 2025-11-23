@@ -74,7 +74,7 @@ This will open a graphical window displaying the Abstract Syntax Tree of the spe
 
 Here is the PsAstViewer interface:
 
-![AST Viewer UI](https://github.com/user-attachments/assets/c515813e-2b66-49f6-9a85-4d7a30e6fbf7)
+![AST Viewer UI](https://github.com/user-attachments/assets/1b7d6424-8c53-48c5-bd4d-f5ddb093c279)
 
 ## 🖥️ User Interface Overview
 
@@ -94,7 +94,8 @@ An **editable text box** showing the PowerShell source code.
 - When you select an AST node in the tree, the corresponding code region is **highlighted** in this view.  
 - If you select another AST node via the properties panel, its code range is **additionally highlighted**, making overlapping regions visible.  
 - When you **Ctrl + Click** (or use right click context menu) anywhere in the code editor, the viewer automatically determines which AST node corresponds to that position, selects it in the tree, and highlights its range in the code.  
-- If you **edit the code**, the AST tree and property panels are automatically **reparsed and updated** to reflect the new structure.
+- Use **Ctrl + F** to search
+- The status bar displays information about the token located at the current cursor position (current char index, token kind, flags)
 You can edit the script directly in the **Code View** pane — changes will trigger automatic AST regeneration.
 
 This interactive and synchronized interface makes it easy to explore how each code fragment maps to the underlying AST and vice versa.
