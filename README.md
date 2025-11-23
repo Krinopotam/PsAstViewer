@@ -96,9 +96,21 @@ An **editable text box** showing the PowerShell source code.
 - When you **Ctrl + Click** (or use right click context menu) anywhere in the code editor, the viewer automatically determines which AST node corresponds to that position, selects it in the tree, and highlights its range in the code.  
 - Use **Ctrl + F** to search.
 - The status bar displays information about the token located at the current cursor position (current char index, token kind, flags)
-You can edit the script directly in the **Code View** pane — changes will trigger automatic AST regeneration.
+- You can edit the script directly in the **Code View** pane — changes will trigger automatic AST regeneration.
 
-This interactive and synchronized interface makes it easy to explore how each code fragment maps to the underlying AST and vice versa.
+### Shallow FindAll Result
+
+PowerShell's `Ast.FindAll(predicate, searchNested: false)` is advertised as a *non-recursive* search,  
+but in practice it still includes certain nested AST nodes due to the internal structure of the parser.
+
+To inspect the exact output of `FindAll(false)` for any specific AST node:
+
+1. Select the node in the AST Tree.  
+2. Right-click to open the context menu.  
+3. Choose **Shallow FindAll Result**.
+
+This displays the precise list of AST nodes that PowerShell considers “non-nested” for the selected node,
+allowing you to understand how the parser actually interprets shallow traversal in this context.
 
 ---
 
