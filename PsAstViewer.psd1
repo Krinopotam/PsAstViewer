@@ -1,6 +1,6 @@
 ﻿@{
     RootModule        = 'PsAstViewer.psm1'
-    ModuleVersion     = '1.0.5'
+    ModuleVersion     = '1.0.6'
     GUID              = '5b9fda12-0d29-4d99-9c47-008d2e857296'
     Author            = 'Maxim Zaytsev'
     Copyright         = '(c) 2025 Maxim Zaytsev. All rights reserved.'

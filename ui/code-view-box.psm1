@@ -335,6 +335,7 @@ Class CodeViewBox {
         return $result | Sort-Object Start
     }
 
+    # Highlight text
     [void]highlightText([string]$scrollToBlock = $null) {
         $this.suppressSelectionChanged = $true
         $rtb = $this.instance
@@ -362,12 +363,13 @@ Class CodeViewBox {
         $rtb.DeselectAll()
         $rtb.Select($currentPos, 0)
         if ($scrollToBlock) { $this.ScrollToCaret() }
-        else { $this.RestoreScrollPos($scrollPos) }
+        else { $this.SetScrollPos($scrollPos) }
 
         $this.EnableRedraw()
         $this.suppressSelectionChanged = $false
     }
 
+    # Get current scroll position
     [hashtable]GetScrollPos() {
         $wmUser = 0x400
         $emGetScrollPos = $wmUser + 221
@@ -383,7 +385,8 @@ Class CodeViewBox {
         return @{X = $x; Y = $y }
     }
 
-    [void]RestoreScrollPos([hashtable]$scrollPos) {
+    # Set scroll position
+    [void]SetScrollPos([hashtable]$scrollPos) {
         $wmUser = 0x400
         $emSetScrollPos = $wmUser + 222
         # Allocate 8 bytes for POINT structure (x, y)
@@ -397,12 +400,15 @@ Class CodeViewBox {
         [System.Runtime.InteropServices.Marshal]::FreeHGlobal($ptr)
     }
    
+    # Disable richTextBox redraw
     [void]DisableRedraw() {
         $this.instance.SuspendLayout()
         $wmSetRedraw = 0xB
         [Win32]::SendMessage($this.instance.Handle, $wmSetRedraw, $false, 0)
 
     }
+
+    # Enable richTextBox redraw
     [void]EnableRedraw() {
         $wmSetRedraw = 0xB
         [Win32]::SendMessage($this.instance.Handle, $wmSetRedraw, $true, 0)
@@ -410,6 +416,7 @@ Class CodeViewBox {
         $this.instance.Refresh()
     }
 
+    # Scroll richTextBox to caret. Keep scroll if caret is visible
     [void]ScrollToCaret() {
         # Get caret position in pixels relative to the RichTextBox control
         $pt = $this.instance.GetPositionFromCharIndex($this.instance.SelectionStart)
@@ -488,6 +495,7 @@ Class CodeViewBox {
         $this.highlightText($scrollToBlock)
     }
 
+    # Get selected text in richTextBox
     [string]getSelectedText() {
         $res = $this.instance.SelectedText
         if (-not $res) { $res = "" }
@@ -505,14 +513,14 @@ Class CodeViewBox {
         $tokenName = ""
         $tokenFlags = ""
         if ($token) {
-            $tokenName = "Token: " + $token.Kind
+            $tokenName = "      Token: [$($token.Kind)]"
             if ($token.TokenFlags) { 
                 $tokenFlags = $token.TokenFlags -join ", " 
-                $tokenFlags = "; flags: $tokenFlags"
+                $tokenFlags = "      Flags: [$tokenFlags]"
             }
         }
 
-        $this.codeStatusBar.update("$tokenName$tokenFlags")
+        $this.codeStatusBar.update("Position: $charIndex$tokenName$tokenFlags")
     }
 
     # Returns true if text changed and Ast tree needs to be rebuilt
