@@ -26,7 +26,7 @@ Class SearchPanel {
         $this.txtSearch = [System.Windows.Forms.TextBox]::new()
         $this.txtSearch.Tag = $this
         $this.txtSearch.Name = "txtSearch"
-        $this.txtSearch.Width = 100
+        $this.txtSearch.Width = 250
         $this.txtSearch.Left = 3
         $this.txtSearch.BackColor = [System.Drawing.Color]::LemonChiffon
         $this.txtSearch.BorderStyle = [System.Windows.Forms.BorderStyle]::None
@@ -95,9 +95,7 @@ Class SearchPanel {
         $closeButton.Add_Click({ 
                 param($s, $e)
                 $self = $s.Tag
-                $self.panelSearch.Visible = $false
-                $self.txtSearch.Text = ""
-                $self.container.Focus()
+                $self.show($false)
             })
         $this.panelSearch.Controls.Add($closeButton)
 
@@ -165,7 +163,10 @@ Class SearchPanel {
                 $this.txtSearch.SelectionLength = $initialVal.Length
             }
         }
-        else { $this.txtSearch.Text = "" }
+        else { 
+            $this.txtSearch.Text = "" 
+            $this.container.Focus()
+        }
     }
 
     [void]toggle() {
@@ -187,14 +188,10 @@ Class SearchPanel {
     [void]setSearchText([string]$text) {
         $this.txtSearch.Text = $text
     }
-
-    [void]invokeDebouncedSearch([string]$direction, [bool]$keepScrollPos) {
-        $this.invokeDebouncedSearch($direction, $keepScrollPos, -1)
-    }
     
     # Debounced search rerun if visible
-    [void]invokeDebouncedSearch([string]$direction, [bool]$keepScrollPos, [int]$searchStartPos) {
+    [void]invokeDebouncedSearch([string]$direction, [bool]$keepScrollPos) {
         if (-not $this.isVisible()) { return }
-        $this.debounce.run({ param($self, [string]$txt, [string]$dir, [bool]$keepScroll, [int]$startPos) $self.parent.onSearch($txt, $dir, $keepScroll, $startPos) }, @($this, $this.txtSearch.Text, $direction, $keepScrollPos, $searchStartPos)) 
+        $this.debounce.run({ param($self, [string]$txt, [string]$dir, [bool]$keepScroll) $self.parent.onSearch($txt, $dir, $keepScroll) }, @($this, $this.txtSearch.Text, $direction, $keepScrollPos)) 
     }
 }

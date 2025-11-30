@@ -438,11 +438,11 @@ Class CodeViewBox {
     }
 
     [void]onSearch([string]$text, [string]$direction) { 
-        $this.onSearch($text, $direction, $false, -1)
+        $this.onSearch($text, $direction, $false)
     }
 
     # Search substring
-    [void]onSearch([string]$text, [string]$direction, [bool]$keepScrollPos, [int]$searchStartPos) {
+    [void]onSearch([string]$text, [string]$direction, [bool]$keepScrollPos) {
         if (-not $text) { 
             $this.foundBlock = $null
             $this.highlightText($null)
@@ -457,29 +457,30 @@ Class CodeViewBox {
             $curr =[Math]::Min($curr,  $this.foundBlock.Start) 
             $direction=""
         }
-        if ($searchStartPos -ge 0) { $curr = $searchStartPos }
+
         $index = -1
 
+        [StringComparison] $ignoreCase = [StringComparison]::InvariantCultureIgnoreCase
         switch ($direction) {
 
             '' {
                 # first search from beginning
-                $index = $full.IndexOf($text, $curr, [StringComparison]::'InvariantCultureIgnoreCase')
-                if ($index -lt 0) { $index = $full.IndexOf($text, 0, [StringComparison]::'InvariantCultureIgnoreCase') }
+                $index = $full.IndexOf($text, $curr, $ignoreCase)
+                if ($index -lt 0) { $index = $full.IndexOf($text, 0, $ignoreCase) }
             }
 
             'next' {
                 $start = $curr + 1
                 if ($start -ge $full.Length) { $start = 0 }
-                $index = $full.IndexOf($text, $start, [StringComparison]::'InvariantCultureIgnoreCase')
-                if ($index -lt 0) { $index = $full.IndexOf($text, 0, [StringComparison]::'InvariantCultureIgnoreCase') }
+                $index = $full.IndexOf($text, $start, $ignoreCase)
+                if ($index -lt 0) { $index = $full.IndexOf($text, 0, $ignoreCase) }
             }
 
             'prev' {
                 $start = $curr - 1
                 if ($start -lt 0) { $start = $full.Length - 1 }
-                $index = $full.LastIndexOf($text, $start, [StringComparison]::'InvariantCultureIgnoreCase')
-                if ($index -lt 0) { $index = $full.LastIndexOf($text, $full.Length - 1, [StringComparison]::'InvariantCultureIgnoreCase') }
+                $index = $full.LastIndexOf($text, $start, $ignoreCase)
+                if ($index -lt 0) { $index = $full.LastIndexOf($text, $full.Length - 1, $ignoreCase) }
             }
         }
 
