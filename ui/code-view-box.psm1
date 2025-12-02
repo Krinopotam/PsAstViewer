@@ -510,6 +510,8 @@ Class CodeViewBox {
             return 
         }
 
+        if (-not $this.astModel) { return }
+
         $token = $this.astModel.GetTokenByCharIndex($charIndex)
         $tokenName = ""
         $tokenFlags = ""
