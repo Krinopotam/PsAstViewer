@@ -83,11 +83,12 @@ The application window consists of three main panels:
 ### 1. **AST Tree (Top-Left)**
 A **TreeView** control displaying the hierarchical structure of AST nodes.  
 Each node represents an element of the PowerShell script (such as a statement, expression, or parameter).
+- Select Ast node to see it properties and highlight corresponding code in **Code View (Right)** panel
+- Use **Ctrl + F** to search.
 
 ### 2. **AST Node Properties (Bottom-Left)**
 Displays the **properties** of the currently selected AST node.  
-- If a property is itself another AST node, you can **Ctrl + Click** (or use right click context menu) on it to jump directly to that node in the tree.  
-- This allows for fast navigation between related elements of the syntax structure.
+- If a property is itself another AST node, you can **Ctrl + Click** (or use right click context menu) on it to jump directly to that node in the tree. This allows for fast navigation between related elements of the syntax structure.
 
 ### 3. **Code View (Right)**
 An **editable text box** showing the PowerShell source code.  
