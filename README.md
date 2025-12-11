@@ -22,7 +22,7 @@ You can install **PsAstViewer** either from the **PowerShell Gallery** or direct
 Run the following command in PowerShell (requires internet access):
 
 ```powershell
-Install-Module PsAstViewer -Scope CurrentUser
+Install-Module PsAstViewer -Scope CurrentUser -Force
 ```
 
 Then import the module:
