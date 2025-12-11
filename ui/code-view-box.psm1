@@ -5,7 +5,6 @@ using module .\code-status-bar.psm1
 using module ..\utils\debounce.psm1
 using namespace System.Management.Automation.Language
 
-$global:MyCounter = 0
 Class CodeViewBox {
     # Main form instance
     [object]$mainForm # can't use type [MainForm] due to circular dependency
