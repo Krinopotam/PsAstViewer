@@ -193,12 +193,11 @@ Class AstPropertyView {
             $val = $this.getPropertyValue($p)
             $name = $p.Name
             $taggedType = $type
-            $taggedName = $name
+            $taggedName = "<b>$name</b>"
             $color = "#CD9C6C"
             if ($p.Value -is [Ast]) { 
                 if ($this.astColorsMap.ContainsKey($type)) { $color = $this.astColorsMap[$type] }
                 $taggedType = "<b>$type</b>" 
-                $taggedName = "<b>$name</b>"
             }
             $taggedText = "<color:#C480DC>[</color><color:$color>$taggedType</color><color:#C480DC>]</color> $taggedName"
             $nodeStr = "[$type] $name"
