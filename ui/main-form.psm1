@@ -8,7 +8,7 @@ using module ..\utils\ast-colors-generator.psm1
 using namespace System.Management.Automation.Language
 using namespace System.Windows.Forms
         
-Class MainForm {
+class MainForm {
     # Main form instance
     [System.Windows.Forms.Form]$instance
     # Left panel instance
@@ -41,8 +41,11 @@ Class MainForm {
     [hashtable]$astColorsMap
     # Keep the offset of the filtered ast extent (ast extent has positions from full script code, but filtered extents code is a subset of the full code)
     [int]$filteredOffset = 0
+    # Module Version
+    [string]$version
     
-    MainForm() {
+    MainForm([string]$version) {
+        $this.version = $version
         $astColorsGenerator = [AstColorsGenerator]::new()
         $this.astColorsMap = $astColorsGenerator.GetColorsMap()
         $this.instance = $this.Init()
@@ -51,7 +54,9 @@ Class MainForm {
     [System.Windows.Forms.Form]Init() {
         $form = [System.Windows.Forms.Form]::new()
         $form.Tag = $this
-        $form.Text = "Ast Viewer"
+        $iconPath = Join-Path $PSScriptRoot '..\icons\PsAstViewer.ico'
+        if (Test-Path $iconPath) { $form.Icon = New-Object System.Drawing.Icon($iconPath) }
+        $form.Text = "Ast Viewer v.$($this.version)"
         $form.Size = New-Object System.Drawing.Size(1200, 800)
         $form.StartPosition = "CenterScreen"
         $form.WindowState = [System.Windows.Forms.FormWindowState]::Normal
