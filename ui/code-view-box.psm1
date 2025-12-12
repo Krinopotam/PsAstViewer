@@ -5,7 +5,7 @@ using module .\code-status-bar.psm1
 using module ..\utils\debounce.psm1
 using namespace System.Management.Automation.Language
 
-Class CodeViewBox {
+class CodeViewBox {
     # Main form instance
     [object]$mainForm # can't use type [MainForm] due to circular dependency
     # Parent container instance
@@ -62,8 +62,8 @@ Class CodeViewBox {
         $textBox.Multiline = $true          
         $textBox.WordWrap = $true
         $textBox.Font = [System.Drawing.Font]::new("Courier New", 12)
-        $textBox.ScrollBars = "Both";
-        $textBox.WordWrap = $false;
+        $textBox.ScrollBars = "Both"
+        $textBox.WordWrap = $false
         $textBox.Anchor = "Top, Bottom, Left, Right"
         $textBox.Tag = $this
         $this.container.Controls.Add($textBox)
@@ -442,19 +442,18 @@ Class CodeViewBox {
 
     # Search substring
     [void]onSearch([string]$text, [string]$direction, [bool]$keepScrollPos) {
-        if (-not $text) { 
+        if (-not $text -or -not $this.instance.Text) {
             $this.foundBlock = $null
             $this.highlightText($null)
-            return 
+            return
         }
 
         $full = $this.instance.Text
-        if (-not $full) { return }
    
         $curr = $this.instance.SelectionStart
-        if ($direction -eq "Current" -and $this.foundBlock) { 
-            $curr =[Math]::Min($curr,  $this.foundBlock.Start) 
-            $direction=""
+        if ($direction -eq "Current") { 
+            if ($this.foundBlock) { $curr = [Math]::Min($curr, $this.foundBlock.Start) }
+            $direction = ""
         }
 
         $index = -1

@@ -170,6 +170,7 @@ class MainForm {
     [void]loadScript([string]$path) {
         if (-not (Test-Path -LiteralPath $path -PathType Leaf -ErrorAction SilentlyContinue)) {
             MessageBox::Show("File not found: $path", "Error", [MessageBoxButtons]::OK, [MessageBoxIcon]::Error)
+            return
         }
 
         $this.lastLoadedPath = $path
