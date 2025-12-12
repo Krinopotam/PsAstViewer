@@ -22,7 +22,7 @@
             Tags       = @('PowerShell', 'AST', 'Syntax', 'Viewer', 'Explorer', 'GUI', 'Tool')
             LicenseUri = 'https://github.com/Krinopotam/PsAstViewer/blob/master/LICENSE'
             ProjectUri = 'https://github.com/Krinopotam/PsAstViewer'
-            # IconUri = ''
+            IconUri = 'https://raw.githubusercontent.com/Krinopotam/PsAstViewer/main/icons/PsAstViewer_128.png'
             # ReleaseNotes = ''
         }
 
