@@ -119,18 +119,22 @@ Class AstTreeView {
                 param($s, $e)
                 $self = $s.Tag
 
-                if ($e.Control -and $e.KeyCode -eq 70) {
-                    # F key
+                if ($e.Control -and $e.KeyCode -eq [System.Windows.Forms.Keys]::F) {
+                    # Ctrl + F key
                     $selText = $self.getSelectedText().trim()
                     if ($self.searchPanel.isVisible() -and -not $selText) { return }
                     $self.searchPanel.show($true, $selText)
                     $e.Handled = $true
                     $e.SuppressKeyPress = $true
                 }
-                elseif ($e.KeyCode -eq 27) {
+                elseif ($e.KeyCode -eq [System.Windows.Forms.Keys]::Escape) {
                     # Escape key
                     if (-not $self.searchPanel.isVisible()) { return }
                     $self.searchPanel.show($false)
+                }
+                elseif ($e.Control -and $e.KeyCode -eq [System.Windows.Forms.Keys]::C) {
+                    # Ctrl + C key
+                    $self.addSelectedNodeToClipboard()
                 }
             })
     }
@@ -395,5 +399,12 @@ Class AstTreeView {
         }
 
         return $null
+    }
+
+    # Add selected node text to clipboard
+    [void]addSelectedNodeToClipboard() {
+        $node = $this.instance.SelectedNode
+        if (-not $node) { return }
+        $node.Text | Set-Clipboard
     }
 }

@@ -4,7 +4,7 @@ using module ..\utils\node-drawer.psm1
 using module ..\utils\text-tag-parser.psm1
 using namespace System.Management.Automation.Language
 
-Class AstPropertyView {
+class AstPropertyView {
     [object]$mainForm # can't use type [MainForm] due to circular dependency
     [System.Windows.Forms.Control]$container
     [System.Windows.Forms.TreeView]$instance
@@ -87,6 +87,15 @@ Class AstPropertyView {
                 param($s, $e)
                 $s.Tag.nodeDrawer.drawNode($s, $e, $e.Node.Tag.NameParts)
             })
+
+        $treeView.Add_KeyDown({
+                param($s, $e)
+                $self = $s.Tag
+                if ($e.Control -and $e.KeyCode -eq [System.Windows.Forms.Keys]::C) {
+                    # Ctrl + C key
+                    $self.addSelectedNodeToClipboard()
+                }
+            })
     }
 
     [void]initContextMenu([System.Windows.Forms.TreeView]$treeView) {
@@ -101,11 +110,14 @@ Class AstPropertyView {
                 }
 
                 $obj = $node.Tag.Parameter
-                if ($obj -is [Ast]) { return }
-                $e.Cancel = $true
+                $isAst =  $obj -is [Ast]
+                $s.Items["selectAst"].Visible = $isAst
+                $s.Items["showFindAllUnnested"].Visible = $isAst
+                $s.Items["copyToClipboard"].Visible = $true
             })
             
         $selectAst = $menu.Items.Add("Select Ast Node   (ctrl+click)")
+        $selectAst.Name = "selectAst"
         $selectAst.Add_Click({ 
                 param($s, $e)
                 # sender is a ToolStripMenuItem; get its ContextMenuStrip (owner)
@@ -120,6 +132,7 @@ Class AstPropertyView {
             })
 
         $showFindAllUnnested = $menu.Items.Add("Filtered Shallow View (FindAll nested = false)")
+        $showFindAllUnnested.Name = "showFindAllUnnested"
         $showFindAllUnnested.Add_Click({ 
                 param($s, $e)
                 # sender is a ToolStripMenuItem; get its ContextMenuStrip (owner)
@@ -131,6 +144,20 @@ Class AstPropertyView {
                 $self = $ctrl.Tag
                 $obj = $node.Tag.Parameter
                 if ($obj -is [Ast]) { $self.mainForm.filterByFindAllCommand($obj, $false) }
+            })
+
+        $copyToClipboard = $menu.Items.Add("Copy to Clipboard")
+        $copyToClipboard.Name = "copyToClipboard"
+        $copyToClipboard.Add_Click({ 
+                param($s, $e)
+                # sender is a ToolStripMenuItem; get its ContextMenuStrip (owner)
+                $cms = $s.GetCurrentParent()
+                $ctrl = $cms.SourceControl
+                $node = $ctrl.SelectedNode
+                if (-not $node) { return }
+
+                $self = $ctrl.Tag
+                $self.addSelectedNodeToClipboard()
             })
 
         $treeView.ContextMenuStrip = $menu
@@ -222,7 +249,7 @@ Class AstPropertyView {
 
     [void]processMethodsProperty([object]$obj, $parentNode) {
         #methods processing
-        $realMethods = ([PSObject]$obj).PSObject.Methods |  Where-Object {
+        $realMethods = ([PSObject]$obj).PSObject.Methods | Where-Object {
             $_.Name -notmatch '^(get_|set_)' -and
             $_.Name -notin @('Equals', 'GetHashCode', 'GetType', 'ToString')
         }
@@ -281,7 +308,7 @@ Class AstPropertyView {
 
         if ($this.isValuePrimitive($prop.Value) -or $prop.Value -is [enum] -or $prop.Value -is [IScriptExtent]) {
             $val = $prop.Value.ToString() 
-            if ($val.Length -gt 50) { $val = $val.Substring(0, 50) + "..." }
+            if ($val.Length -gt 200) { $val = $val.Substring(0, 200) + "..." }
             return $val
         }
 
@@ -291,5 +318,12 @@ Class AstPropertyView {
         }
 
         return "object"
+    }
+
+    # Add selected node text to clipboard
+    [void]addSelectedNodeToClipboard() {
+        $node = $this.instance.SelectedNode
+        if (-not $node) { return }
+        $node.Text | Set-Clipboard
     }
 }
