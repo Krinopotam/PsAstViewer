@@ -1,5 +1,5 @@
-Add-Type -AssemblyName System.Windows.Forms
-Add-Type -AssemblyName System.Drawing
+using assembly System.Windows.Forms
+using assembly System.Drawing
 
 Add-Type @"
 using System;

@@ -97,8 +97,3 @@ class TextTagParser {
         }
     }
 }
-
-
-$par = [TextTagParser]::new()
-
-$par.Parse("Neutral text <color:red><b>bold red text</b></color> other neutral text<color:green>green text</color> another neutral text <bgColor:blue>blue <i>background</i> text</bgColor>")

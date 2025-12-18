@@ -5,9 +5,6 @@ using module ..\utils\text-tag-parser.psm1
 using module .\search-panel.psm1
 using namespace System.Management.Automation.Language
 
-Add-Type -AssemblyName System.Windows.Forms
-Add-Type -AssemblyName System.Drawing
-
 Class AstTreeView {
     [object]$mainForm # can't use type [MainForm] due to circular dependency
     [System.Windows.Forms.Control]$container

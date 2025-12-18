@@ -1,8 +1,14 @@
-﻿Remove-Module PsAstViewer -ErrorAction SilentlyContinue
+﻿###################################### PsAstViewer #######################################
+#Author: Zaytsev Maksim
+#Version: 1.0.13
+#requires -Version 5.1
+##########################################################################################
 
-Import-Module ".\PsAstViewer.psd1" -Force
-Show-AstViewer
+[CmdletBinding()]
+param([string]$path = "")
+
+Remove-Module PsAstViewer -ErrorAction SilentlyContinue
+
+Import-Module ".\PsAstViewer.psm1" -Force
+Show-AstViewer -path $path
 #Show-AstViewer -Path ".\dev\example.ps1"
-#Show-AstViewer -Path ".\ui\code-view-box.psm1"
-#Show-AstViewer -Path "C:\Projects\powershell\PsBundler\build\psbundler-2.0.4.ps1"
-#Show-AstViewer

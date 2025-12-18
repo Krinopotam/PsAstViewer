@@ -1,0 +1,11 @@
+{
+	"projectRoot": ".\\",
+	"outDir": "build",
+	"entryPoints": {
+		"run.ps1": "PsAstViewer.ps1"
+	},
+	"stripComments": true,
+	"keepHeaderComments": true,
+	"deferClassesCompilation": true,
+	"embedClassesAsBase64": false
+}
