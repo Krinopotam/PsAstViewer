@@ -35,7 +35,7 @@ Import-Module PsAstViewer
 
 1. Clone or download this repository:
    ```powershell
-   git clone https://github.com/yourusername/PsAstViewer.git
+   git clone https://github.com/Krinopotam/PsAstViewer.git
    ```
 
 2. Import the module manually:
