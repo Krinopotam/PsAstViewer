@@ -31,7 +31,7 @@ public static class Keyboard {
 }
 "@
 
-$__CLASSES_SOURCE_b55575f853be427da33170b711913062 = @'
+$__CLASSES_SOURCE_ad0457f118e34fb6bd0df8542399ea77 = @'
 class RunApp {
     RunApp([string]$version, [string]$Path) {
         if ($Path) {
@@ -2224,14 +2224,14 @@ class AstColorsGenerator {
     }
 }
 '@
-Invoke-Expression $__CLASSES_SOURCE_b55575f853be427da33170b711913062
-$__CLASSES_SOURCE_b55575f853be427da33170b711913062 = $null
+Invoke-Expression $__CLASSES_SOURCE_ad0457f118e34fb6bd0df8542399ea77
+$__CLASSES_SOURCE_ad0457f118e34fb6bd0df8542399ea77 = $null
 
 
-$global:__MODULES_23cae084a4a5418785e458dfa92ca866 = @{}
+$global:__MODULES_8f01c6acde144d299209018fac2b7c2c = @{}
 
 
-$global:__MODULES_23cae084a4a5418785e458dfa92ca866["ded4424bc84e40659c54b66545cdfb18"] = {
+$global:__MODULES_8f01c6acde144d299209018fac2b7c2c["3dc5e28d2f934e2a846b48fbee630e38"] = {
     Set-StrictMode -Version Latest
     
     function Show-AstViewer {    
@@ -2249,5 +2249,5 @@ $global:__MODULES_23cae084a4a5418785e458dfa92ca866["ded4424bc84e40659c54b66545cd
 
 Remove-Module PsAstViewer -ErrorAction SilentlyContinue
 
-Import-Module (New-Module -Name PsAstViewer -ScriptBlock $global:__MODULES_23cae084a4a5418785e458dfa92ca866["ded4424bc84e40659c54b66545cdfb18"]) -Force -DisableNameChecking
+Import-Module (New-Module -Name PsAstViewer -ScriptBlock $global:__MODULES_8f01c6acde144d299209018fac2b7c2c["3dc5e28d2f934e2a846b48fbee630e38"]) -Force -DisableNameChecking
 Show-AstViewer -path $path

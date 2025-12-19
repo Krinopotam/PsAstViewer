@@ -20,7 +20,8 @@
         if (-not (Test-Path $srcItem)) { Write-Warning "Skipping missing item: $srcItem"; continue }
 
         # Calculate target path
-        $destItem = Join-Path $PublishPath $item
+        $clearItemPath = $item.Replace("..\", "")
+        $destItem = Join-Path $PublishPath $clearItemPath
         $destDir = Split-Path $destItem -Parent
 
         # Ensure parent directories exist

@@ -34,23 +34,35 @@ Import-Module PsAstViewer
 ### 💾 Option 2 — From GitHub
 
 1. Clone or download this repository:
+
    ```powershell
    git clone https://github.com/Krinopotam/PsAstViewer.git
    ```
 
 2. Import the module manually:
+
    ```powershell
    Import-Module .\PsAstViewer\PsAstViewer.psd1
    ```
 
 3. (Optional) To make the module available globally, copy the folder to one of the PowerShell module paths, for example:
+
    ```powershell
    $env:USERPROFILE\Documents\WindowsPowerShell\Modules\PsAstViewer
    ```
 
+### 📜 Option 3 — Standalone bundled script
+
+PsAstViewer is also distributed as a **self-contained bundled script**.
+
+Prebuilt standalone bundles are published on the
+[latest GitHub release](https://github.com/Krinopotam/PsAstViewer/releases/latest).
+
+This standalone script contains the full PsAstViewer implementation and does **not require module installation or import**.
+
 ---
 
-## 🚀 Usage
+## 🚀 Usage (Module)
 
 To launch the AST Viewer, run:
 
@@ -59,6 +71,27 @@ Show-AstViewer -Path ".\example.ps1"
 ```
 
 This will open a graphical window displaying the Abstract Syntax Tree of the specified PowerShell script.
+
+## 🚀 Usage (Standalone Script)
+
+PsAstViewer can also be used as a **standalone bundled script**. This mode does not require module installation or import.
+
+You can run the script from the PowerShell command line:
+
+```powershell
+./PsAstViewer-X.X.X.ps1 -Path ".\example.ps1"
+```
+
+On Windows, the standalone script can also be executed via the **context menu**
+by right-clicking the file `PsAstViewer-X.X.X.ps1` and selecting “**Run with PowerShell**”.
+
+In addition to executing the standalone script as a file, PsAstViewer can also be used by **copying the entire contents of the bundled script and pasting it directly into a PowerShell console**.
+
+This option is useful when:
+
+- installing modules is not possible or undesirable
+- a fully portable, single-file solution is required
+- PsBundler needs to be used in restricted or isolated environments
 
 ---
 
@@ -81,17 +114,23 @@ Here is the PsAstViewer interface:
 The application window consists of three main panels:
 
 ### 1. **AST Tree (Top-Left)**
-A **TreeView** control displaying the hierarchical structure of AST nodes.  
+
+A **TreeView** control displaying the hierarchical structure of AST nodes.
 Each node represents an element of the PowerShell script (such as a statement, expression, or parameter).
+
 - Select Ast node to see it properties and highlight corresponding code in **Code View (Right)** panel
 - Use **Ctrl + F** to search.
 
 ### 2. **AST Node Properties (Bottom-Left)**
-Displays the **properties** of the currently selected AST node.  
+
+Displays the **properties** of the currently selected AST node.
+
 - If a property is itself another AST node, you can **Ctrl + Click** (or use right click context menu) on it to jump directly to that node in the tree. This allows for fast navigation between related elements of the syntax structure.
 
 ### 3. **Code View (Right)**
-An **editable text box** showing the PowerShell source code.  
+
+An **editable text box** showing the PowerShell source code.
+
 - When you select an AST node in the tree, the corresponding code region is **highlighted** in this view.  
 - If you select another AST node via the properties panel, its code range is **additionally highlighted**, making overlapping regions visible.  
 - When you **Ctrl + Click** (or use right click context menu) anywhere in the code editor, the viewer automatically determines which AST node corresponds to that position, selects it in the tree, and highlights its range in the code.  

@@ -22,7 +22,6 @@ $include = @(
     'models',
     'ui',
     'utils',
-    'icons',
     'LICENSE',
     'README.md'
 )

@@ -6,6 +6,9 @@
 
 using namespace System.Management.Automation.Language
 
+[CmdletBinding()]
+param([string]$configPath = "")
+
 Class PsBundler { 
     [object]$_config
 
@@ -75,7 +78,8 @@ Class ScriptBundler {
     }
 }
 
-Class BundlerConfig {    
+class BundlerConfig {    
+    [string]$configPath    
     [string]$projectRoot = ".\"    
     [string]$outDir = "build"    
     [hashtable]$entryPoints = @{}    
@@ -90,35 +94,45 @@ Class BundlerConfig {
     [ObjectHelpers]$_objectHelpers
     [PathHelpers]$_pathHelpers
 
-    BundlerConfig ([string]$configPath="") {
+    BundlerConfig ([string]$configPath = "") {
         $this._objectHelpers = [ObjectHelpers]::New()
         $this._pathHelpers = [PathHelpers]::New()
-        $this.Load($configPath)
+        
+        if ($configPath) {
+            $this.configPath = $this._pathHelpers.GetFullPath($configPath)
+        }
+        
+        if (-not $this.configPath) { 
+            $scriptLaunchPath = Get-Location 
+            $this.configPath = [System.IO.Path]::Combine($scriptLaunchPath, 'psbundler.config.json')
+        }
+        
+        $this.Load()
         $this.modulesSourceMapVarName = "__MODULES_" + [Guid]::NewGuid().ToString("N")
     }
 
-    [void]Load([string]$configPath="") {        
+    [void]Load() {        
         $config = @{
-            projectRoot        = ".\"          
-            outDir             = "build"       
-            entryPoints        = @{}           
-            stripComments      = $true         
-            keepHeaderComments = $true         
-            obfuscate          = ""            
+            projectRoot             = ".\"          
+            outDir                  = "build"       
+            entryPoints             = @{}           
+            stripComments           = $true         
+            keepHeaderComments      = $true         
+            obfuscate               = ""            
             deferClassesCompilation = $false   
-            embedClassesAsBase64 = $false      
+            embedClassesAsBase64    = $false      
         }
 
-        $userConfig = $this.GetConfigFromFile($configPath)
+        $userConfig = $this.GetConfigFromFile()
 
         foreach ($key in $userConfig.Keys) { $config[$key] = $userConfig[$key] }
         
-        $root = [System.IO.Path]::GetFullPath($config.projectRoot)
+        $configDir = [System.IO.Path]::GetDirectoryName($this.configPath)
+        $root = $this._pathHelpers.GetFullPath($config.projectRoot, $configDir)
         $this.projectRoot = $root
             
         if (-not $config.outDir) { $config.outDir = "" }
-        if (-not ([System.IO.Path]::IsPathRooted($config.outDir))) { $config.outDir = Join-Path $root $config.outDir }
-        $this.outDir = [System.IO.Path]::GetFullPath($config.outDir)
+        $this.outDir = $this._pathHelpers.GetFullPath($config.outDir, $root)
         
         if (-not $userConfig.entryPoints -or $userConfig.entryPoints.Count -eq 0) { throw "No entry points found in config" }
 
@@ -126,8 +140,8 @@ Class BundlerConfig {
         foreach ($entryPath in $config.entryPoints.Keys) {
             $bundleName = $config.entryPoints[$entryPath]
             if (-not ($this._pathHelpers.IsValidPath($bundleName))) { throw "Invalid bundle name: $bundleName" }
-
-            $entryAbsPath = [System.IO.Path]::GetFullPath( (Join-Path $root $entryPath))
+            $entryAbsPath = $this._pathHelpers.GetFullPath($entryPath, $root)
+            if (-not $entryAbsPath) { throw "Invalid entry path: $entryPath" }
             $this.entryPoints[$entryAbsPath] = $bundleName
         }
 
@@ -143,27 +157,20 @@ Class BundlerConfig {
         $this.embedClassesAsBase64 = $config.embedClassesAsBase64
     }
 
-    [PSCustomObject]GetConfigFromFile ([string]$configPath = "") {
-        if (-not $configPath) { 
-            $scriptLaunchPath = Get-Location 
-            $configPath = Join-Path -Path $scriptLaunchPath -ChildPath 'psbundler.config.json'
+    [PSCustomObject]GetConfigFromFile () {
+        if (-not (Test-Path $this.configPath)) { 
+            throw "HANDLED: Config file not found: $($this.configPath)"
         }
-
-        if ((Test-Path $configPath)) {
-            try {
-                $config = Get-Content $configPath -Raw | ConvertFrom-Json
-                $configHashTable = $this._objectHelpers.ConvertToHashtable($config)
-                Write-Host "Using config: $(Resolve-Path $configPath)"
-                return $configHashTable
-            }
-            catch {
-                Write-Host "Error reading config file: $($_.Exception.Message)" -ForegroundColor Red
-                exit 1
-            }
+        
+        try {
+            $config = Get-Content $this.configPath -Raw | ConvertFrom-Json
+            $configHashTable = $this._objectHelpers.ConvertToHashtable($config)
+            Write-Host "Using config: $($this.configPath)"
+            return $configHashTable
         }
-    
-        Write-Host "Config file not found: $configPath" -ForegroundColor Red
-        exit 1
+        catch {
+            throw "HANDLED: Error reading config file: $($_.Exception.Message)"
+        }
     }
 }
 
@@ -201,14 +208,37 @@ class ObjectHelpers {
     }
 }
 
-class PathHelpers {
+class PathHelpers {    
     [bool]IsValidPath([string]$path) {
         try {
-            [System.IO.Path]::GetFullPath($path) | Out-Null
+            [System.IO.Path]::GetFullPath($path)
             return $true
         }
         catch {
             return $false
+        }
+    }
+    
+    [string]GetFullPath([string]$path) {
+        try {
+            return [System.IO.Path]::GetFullPath($path)
+        }
+        catch {
+            return ""
+        }
+    }
+    
+    [string]GetFullPath([string]$path, [string]$basePath) {
+        try {
+            if ([System.IO.Path]::IsPathRooted($path)) {
+                return [System.IO.Path]::GetFullPath($path)
+            }
+
+            $combined = [System.IO.Path]::Combine($basePath, $path)
+            return [System.IO.Path]::GetFullPath($combined)
+        }
+        catch {
+            return ""
         }
     }
 }
@@ -380,7 +410,7 @@ Class FileInfo {
             if (-not (Test-Path $filePath)) {
                 $consumerStr = ""
                 if ($consumerInfo) { $consumerStr = "imported by $($consumerInfo.file.path)" }
-                Throw "File not found: $($filePath) $consumerStr"
+                Throw "File not found: $filePath $consumerStr"
             }
 
             $source = Get-Content $filePath -Raw 
@@ -397,7 +427,7 @@ Class FileInfo {
                     $lineNum = $source.Substring(0, $err.Extent.StartOffset).Split("`n").Count
                     Write-Host ("[{0}] {1}" -f $lineNum, $err.Message) -ForegroundColor Yellow
                 }
-                throw "Syntax errors in script."
+                throw "Syntax errors in script '$filePath'"
             }
 
             return @{
@@ -406,8 +436,7 @@ Class FileInfo {
             }
         }
         catch {
-            Write-Error "Error parsing file: $($_.Exception.Message)"
-            exit
+            throw "HANDLED: Error parsing file: $($_.Exception.Message)"
         }
     }
 
@@ -617,15 +646,15 @@ Class ImportParser {
 
     [string] ResolveImportPath(
         [FileInfo]$caller,                             
-        [string] $ImportType,                          
-        [string] $ImportPath                           
+        [string] $importType,                          
+        [string] $importPath                           
     ) {
-        if (-not $ImportPath) { return $null }
+        if (-not $importPath) { return $null }
 
         $callerPath = $caller.path
         $projectRoot = $this._config.projectRoot
 
-        $Resolved = $ImportPath
+        $resolved = $importPath
 
         $callerDir = [System.IO.Path]::GetDirectoryName($callerPath)
         $pathVars = @{
@@ -636,21 +665,21 @@ Class ImportParser {
         
         foreach ($key in $pathVars.Keys) {
             $value = $pathVars[$key]
-            $Resolved = $Resolved -replace ("\$\{?$key\}?"), $value
+            $resolved = $resolved -replace ("\$\{?$key\}?"), $value
         }
         
-        if ($Resolved -match '^(~)([\\/]|$)') { $Resolved = $Resolved -replace '^~', $pathVars['HOME'] }
+        if ($resolved -match '^(~)([\\/]|$)') { $resolved = $resolved -replace '^~', $pathVars['HOME'] }
         
-        if ([System.IO.Path]::IsPathRooted($Resolved)) { return [System.IO.Path]::GetFullPath($Resolved) }
+        if ([System.IO.Path]::IsPathRooted($resolved)) { return [System.IO.Path]::GetFullPath($resolved) }
                         
-        $baseDir = switch ($ImportType) {
+        $baseDir = switch ($importType) {
             'using' { $callerDir }
             'dot' { $projectRoot }
             'ampersand' { $projectRoot }
             'module' { $projectRoot }
         }
         
-        $combined = [System.IO.Path]::Combine($baseDir, $Resolved)
+        $combined = [System.IO.Path]::Combine($baseDir, $resolved)
         return [System.IO.Path]::GetFullPath($combined)
     }
 
@@ -922,8 +951,7 @@ class BundleBuilder {
             return $outputPath
         }
         catch {
-            Write-Host "Error creating bundle: $($_.Exception.Message)" -ForegroundColor Red
-            exit
+            throw "HANDLED: Error creating bundle: $($_.Exception.Message)"
         }
     }
 
@@ -1985,10 +2013,10 @@ Class FuncNameGenerator {
 }
 
 
-$global:__MODULES_005b02a7ccad475f99252c4ea3a680a6 = @{}
+$global:__MODULES_c481812ceb91481e9fcf22d7cfe9f35d = @{}
 
 
-$global:__MODULES_005b02a7ccad475f99252c4ea3a680a6["ca02c95b83614838b1c49aa8deb6b8f8"] = {
+$global:__MODULES_c481812ceb91481e9fcf22d7cfe9f35d["dec18d6262c64288bab546fabf658d62"] = {
     function Invoke-PSBundler {
         [CmdletBinding()]
         param(
@@ -1998,5 +2026,5 @@ $global:__MODULES_005b02a7ccad475f99252c4ea3a680a6["ca02c95b83614838b1c49aa8deb6
     }
 }
 
-Import-Module (New-Module -Name PsBundler -ScriptBlock $global:__MODULES_005b02a7ccad475f99252c4ea3a680a6["ca02c95b83614838b1c49aa8deb6b8f8"]) -Force -DisableNameChecking
-Invoke-PsBundler -verbose
+Import-Module (New-Module -Name PsBundler -ScriptBlock $global:__MODULES_c481812ceb91481e9fcf22d7cfe9f35d["dec18d6262c64288bab546fabf658d62"]) -Force -DisableNameChecking
+Invoke-PsBundler -configPath $configPath
